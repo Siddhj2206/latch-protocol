@@ -20,6 +20,7 @@ export const server = Cloudflare.Worker("server", {
   env: {
     DB: db,
     CORS_ORIGIN: Config.string("CORS_ORIGIN"),
+    ROOT_PUBLIC_KEY: Config.string("ROOT_PUBLIC_KEY"),
   },
   dev: {
     port: 3000,

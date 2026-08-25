@@ -5,9 +5,11 @@
   "scripts": {
     "build": "tsdown",
     "check-types": "tsc -b",
+    "test": "bun test",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server"
   },
   "dependencies": {
+    "@latch-protocol/core": "workspace:*",
     "@latch-protocol/db": "workspace:*",
     "@latch-protocol/env": "workspace:*",
     "dotenv": "catalog:",
@@ -18,6 +20,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@latch-protocol/config": "workspace:*",
     "@types/node": "catalog:",
+    "bun-types": "^1.4.0",
     "tsdown": "^0.22.14",
     "typescript": "catalog:"
   }

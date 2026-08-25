@@ -1,0 +1,27 @@
+{
+  "name": "@latch-protocol/core",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "bun test",
+    "pretest": "node scripts/patch-biscuit-wasm.mjs",
+    "postinstall": "node scripts/patch-biscuit-wasm.mjs"
+  },
+  "dependencies": {
+    "@biscuit-auth/biscuit-wasm": "0.6.0",
+    "@smithery/biscuit": "1.0.1"
+  },
+  "devDependencies": {
+    "@latch-protocol/config": "workspace:*",
+    "bun-types": "^1.4.0",
+    "typescript": "catalog:"
+  }
+}
