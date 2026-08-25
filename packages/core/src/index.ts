@@ -40,6 +40,19 @@ export type RejectionReason =
 
 export type VerifyResult = { authorized: true } | { authorized: false; reason: RejectionReason };
 
+/**
+ * The envelope's four caveats, written once as a comment: the tagged-template
+ * `${...}` interpolation is TERMS-only (never code), so the same lines are
+ * repeated verbatim in `mintRoot` and `mintStepUp`; step-up additionally pins
+ * `intent($i)` and its check.
+ *
+ *   check if amount_cap($c), spot($s), $s <= $c;                          // committed amount ceiling
+ *   check if merchant($m), request_merchant($r), $r == $m;                // audience binding
+ *   check if max_hops($h), hops($n), $n <= $h;                            // delegation depth (verifier injects hops)
+ *   check if max_delta($d), spot($s), exec($e), $e <= $s + ($s * $d / 100); // slippage vs spot
+ *   check if intent($i), request_digest($d), $d == $i;                    // step-up only: one exact spend
+ */
+
 /** Mint an envelope root: the budget authority a whole swarm spends against. */
 export function mintRoot(caps: EnvelopeCaps, key: PrivateKey): string {
   const token = biscuit`
@@ -116,44 +129,8 @@ export async function mintStepUp(spend: SpendIntent, key: PrivateKey): Promise<s
   return token.toBase64();
 }
 
-export interface SingleUseRegistry {
-  /** Claim a step-up token for spending. True only for its first presentation. */
-  claim(token: string, rootPublicKey: PublicKey): boolean;
-  /** Has this step-up envelope already been spent? */
-  peek(token: string, rootPublicKey: PublicKey): boolean;
-}
-
-/**
- * In-memory single-use registry, keyed by the token's root revocation id.
- * Demo-grade: the D1-backed registry is the ledger ticket's job — this is the
- * seam it will replace, so the edge's call shape stays identical.
- */
-export function createSingleUseRegistry(): SingleUseRegistry {
-  const seen = new Set<string>();
-  const idOf = (token: string, rootPublicKey: PublicKey): string | null => {
-    try {
-      const parsed = Biscuit.fromBase64(token, rootPublicKey);
-      const rids = parsed.getRevocationIdentifiers();
-      if (rids.length === 0) return null;
-      const r = rids[0]!;
-      return r instanceof Uint8Array ? [...r].map((b) => b.toString(16)).join("") : String(r);
-    } catch {
-      return null;
-    }
-  };
-  return {
-    claim(token, rootPublicKey) {
-      const id = idOf(token, rootPublicKey);
-      if (id === null || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    },
-    peek(token, rootPublicKey) {
-      const id = idOf(token, rootPublicKey);
-      return id !== null && seen.has(id);
-    },
-  };
-}
+export { createSingleUseRegistry } from "./single-use";
+export type { SingleUseRegistry } from "./single-use";
 
 /** Canonical intent digest: sha256 over {currency, merchantId, amount}. */
 export async function intentDigest(intent: SpendIntent): Promise<string> {
@@ -194,21 +171,20 @@ export async function verifySpend(
     allow if true;
   `.buildAuthenticated(parsed);
 
-  try {
-    auth.authorizeWithLimits(LIMITS);
-    return { authorized: true };
-  } catch (e) {
-    if (isRunLimitTimeout(e)) {
-      try {
-        auth.authorizeWithLimits(RETRY_LIMITS);
-        return { authorized: true };
-      } catch (e2) {
-        if (isRunLimitTimeout(e2)) return { authorized: false, reason: "AmbiguousRejection" };
-        return { authorized: false, reason: attributeRejection(auth, facts, hops) };
-      }
+  // A cold-start datalog budget exhaustion (research §1.6) is a retriable quirk,
+  // not a rejection: try once more with a larger time budget before attributing.
+  let timedOut = false;
+  for (const limits of [LIMITS, RETRY_LIMITS]) {
+    try {
+      auth.authorizeWithLimits(limits);
+      return { authorized: true };
+    } catch (e) {
+      timedOut = isRunLimitTimeout(e);
+      if (!timedOut) break;
     }
-    return { authorized: false, reason: attributeRejection(auth, facts, hops) };
   }
+  if (timedOut) return { authorized: false, reason: "AmbiguousRejection" };
+  return { authorized: false, reason: attributeRejection(auth, facts, hops) };
 }
 
 /** Read a single fact of the form `name($var)` from the token via a datalog query. */
@@ -243,6 +219,13 @@ function readFactStr(auth: Authorizer, factName: string, varName: string): strin
  * datalog query; appended-block facts (intent) are not (empirically), so the
  * intent check is the residual: if every root check passes in JS but authorize
  * still failed, the only remaining check is the attenuation's intent binding.
+ *
+ * Ordering is deliberate and documented: root-level bound violations (money
+ * ceiling, audience, depth, slip) outrank the residual intent check — a spend
+ * that breaks both a root bound AND its intent binding is reported as the root
+ * violation, because that is the harder bound. The zero-tolerance exception:
+ * a step-up (cap == spot, delta == 0) reports IntentMismatch for any exec
+ * drift — the Act 3 "intent hash mismatch" story.
  */
 function attributeRejection(auth: Authorizer, facts: SpendFacts, hops: number): RejectionReason {
   const cap = readFactNum(auth, "amount_cap", "$c");

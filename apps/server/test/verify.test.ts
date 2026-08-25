@@ -59,4 +59,29 @@ describe("the latch edge (Hono app seam)", () => {
     });
     expect(res.status).toBe(503);
   });
+
+  test("POST /v1/verify: the attack matrix hard-fails at the edge (cap, audience)", async () => {
+    const { privateKey, publicKey } = generateKeyPair();
+    const app = createApp({ corsOrigin: "http://localhost:3001", rootPublicKey: publicKey.toString() });
+    const token = mintRoot(
+      { perTxCap: 50_000, merchantId: "mer_sneakerhead", maxHops: 2, maxDeltaPct: 5 },
+      privateKey,
+    );
+
+    const overCap = await app.request("/v1/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, merchantId: "mer_sneakerhead", spot: 51_000, exec: 51_000 }),
+    });
+    expect(overCap.status).toBe(403);
+    expect(await readJson<{ authorized: boolean; reason: string }>(overCap)).toEqual({ authorized: false, reason: "AmountCapExceeded" });
+
+    const wrongMerchant = await app.request("/v1/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, merchantId: "mer_evil", spot: 49_000, exec: 49_000 }),
+    });
+    expect(wrongMerchant.status).toBe(403);
+    expect(await readJson<{ authorized: boolean; reason: string }>(wrongMerchant)).toEqual({ authorized: false, reason: "AudienceMismatch" });
+  });
 });

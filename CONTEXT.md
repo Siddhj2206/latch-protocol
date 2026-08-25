@@ -26,9 +26,9 @@ _Avoid_: agent cluster, token family
 A fresh, single-use, human-approved envelope minted on Approve when the auto envelope is exhausted. It never extends the auto envelope; it is its own bounded spend.
 _Avoid_: top-up, override, extension
 
-**Root issuance**:
-The act of the authority (a root keypair) creating a capability carrying the budget bound and default caveats.
-_Avoid_: minting for step-up (see Step-up), creating a token
+**Root issuance** (a.k.a. minting a root):
+The act of the authority (a root keypair) creating a capability carrying the budget bound and default caveats. In code: `mintRoot`.
+_Avoid_: creating a token, top-up, wallet
 
 **Attenuation**:
 Offline derivation of a sub-capability from a parent capability by tightening caveats (amount cap, audience, delegation depth). Requires no network round-trip.
