@@ -1,0 +1,3 @@
+{
+  "extends": "@latch-protocol/config/tsconfig.base.json"
+}
