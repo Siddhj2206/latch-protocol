@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsdown",
     "check-types": "tsc -b",
-    "test": "bun test",
+    "test": "bun test test/*.test.ts",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "@latch-protocol/db": "workspace:*",
     "@latch-protocol/env": "workspace:*",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.12.32",
     "zod": "catalog:"
   },
