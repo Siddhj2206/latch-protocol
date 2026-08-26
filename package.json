@@ -42,6 +42,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@latch-protocol/config": "workspace:*",
     "@types/node": "catalog:",
+    "miniflare": "^5.20260820.0-alpha",
     "turbo": "^2.10.7",
     "typescript": "catalog:"
   },
