@@ -1,5 +1,6 @@
 import { authorizer, biscuit, block, generateKeyPair, PublicKey, Biscuit, Rule, SignatureAlgorithm } from "@smithery/biscuit";
 import type { Authorizer, PrivateKey } from "@biscuit-auth/biscuit-wasm";
+import { bytesToHex } from "./ids";
 
 export { generateKeyPair, PublicKey, SignatureAlgorithm };
 export type { PrivateKey };
@@ -131,6 +132,37 @@ export async function mintStepUp(spend: SpendIntent, key: PrivateKey): Promise<s
 
 export { createSingleUseRegistry } from "./single-use";
 export type { SingleUseRegistry } from "./single-use";
+export { rootIdOf, capabilityChainId, bytesToHex } from "./ids";
+
+/** The envelope bounds carried by a root block, read off the token itself. */
+export type EnvelopeFacts = EnvelopeCaps;
+
+/**
+ * Read a token's own envelope bounds (amount cap, audience, delegation depth,
+ * slippage) via datalog queries. Used at envelope registration so the D1
+ * envelope row is derived from the token, never from a client-supplied claim.
+ * Returns null for anything that does not parse under the pinned root key.
+ */
+export async function readEnvelopeFacts(
+  capability: string,
+  rootPublicKey: PublicKey,
+): Promise<EnvelopeFacts | null> {
+  let parsed: Biscuit;
+  try {
+    parsed = Biscuit.fromBase64(capability, rootPublicKey);
+  } catch {
+    return null;
+  }
+
+  const auth = authorizer``.buildAuthenticated(parsed);
+  const cap = readFactNum(auth, "amount_cap", "$c");
+  const merchant = readFactStr(auth, "merchant", "$m");
+  const maxHops = readFactNum(auth, "max_hops", "$h");
+  const delta = readFactNum(auth, "max_delta", "$d");
+
+  if (cap === null || merchant === null || maxHops === null || delta === null) return null;
+  return { perTxCap: cap, merchantId: merchant, maxHops, maxDeltaPct: delta };
+}
 
 /** Canonical intent digest: sha256 over {currency, merchantId, amount}. */
 export async function intentDigest(intent: SpendIntent): Promise<string> {
@@ -140,7 +172,7 @@ export async function intentDigest(intent: SpendIntent): Promise<string> {
     amount: intent.execAmount,
   });
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return bytesToHex(new Uint8Array(bytes));
 }
 
 /**
