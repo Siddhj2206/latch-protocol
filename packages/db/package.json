@@ -5,13 +5,21 @@
     ".": {
       "default": "./src/index.ts"
     },
+    "./schema": {
+      "default": "./src/schema/index.ts"
+    },
+    "./ledger": {
+      "default": "./src/ledger.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:migrate:deploy": "drizzle-kit migrate"
+    "db:migrate:deploy": "drizzle-kit migrate",
+    "test": "bun test",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@latch-protocol/env": "workspace:*",
@@ -23,7 +31,9 @@
   },
   "devDependencies": {
     "@latch-protocol/config": "workspace:*",
+    "bun-types": "^1.4.0",
     "drizzle-kit": "^0.31.10",
+    "miniflare": "^5.20260820.0-alpha",
     "typescript": "catalog:"
   }
 }

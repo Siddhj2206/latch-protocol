@@ -21,6 +21,10 @@ export const server = Cloudflare.Worker("server", {
     DB: db,
     CORS_ORIGIN: Config.string("CORS_ORIGIN"),
     ROOT_PUBLIC_KEY: Config.string("ROOT_PUBLIC_KEY"),
+    // Optional secrets: empty string = offline fake gateway / webhook fails closed.
+    RAZORPAY_WEBHOOK_SECRET: Config.string("RAZORPAY_WEBHOOK_SECRET").pipe(Config.withDefault("")),
+    RAZORPAY_KEY_ID: Config.string("RAZORPAY_KEY_ID").pipe(Config.withDefault("")),
+    RAZORPAY_KEY_SECRET: Config.string("RAZORPAY_KEY_SECRET").pipe(Config.withDefault("")),
   },
   dev: {
     port: 3000,
