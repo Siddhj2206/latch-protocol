@@ -15,7 +15,7 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
       publicKey,
     );
 
-    expect(result).toEqual({ authorized: false, reason: "AmountCapExceeded" });
+    expect(result).toMatchObject({ authorized: false, reason: "AmountCapExceeded" });
   });
 
   test("a presentation at another merchant is rejected with AudienceMismatch", async () => {
@@ -28,7 +28,7 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
       publicKey,
     );
 
-    expect(result).toEqual({ authorized: false, reason: "AudienceMismatch" });
+    expect(result).toMatchObject({ authorized: false, reason: "AudienceMismatch" });
   });
 
   test("an execution amount beyond the slippage allowance is rejected with SlippageExceeded", async () => {
@@ -41,7 +41,7 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
       publicKey,
     );
 
-    expect(result).toEqual({ authorized: false, reason: "SlippageExceeded" });
+    expect(result).toMatchObject({ authorized: false, reason: "SlippageExceeded" });
   });
 
   test("a surge within the slippage allowance is absorbed (the ₹15 rain-fee beat)", async () => {
@@ -66,7 +66,7 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
 
     const result = await verifySpend(token, GOOD, publicKey); // 4 blocks -> hops 3 > max 2
 
-    expect(result).toEqual({ authorized: false, reason: "DelegationDepthExceeded" });
+    expect(result).toMatchObject({ authorized: false, reason: "DelegationDepthExceeded" });
   });
 
   test("a tampered execution on a delegated token is rejected with IntentMismatch", async () => {
@@ -86,7 +86,7 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
       publicKey,
     );
 
-    expect(result).toEqual({ authorized: false, reason: "IntentMismatch" });
+    expect(result).toMatchObject({ authorized: false, reason: "IntentMismatch" });
   });
 
   test("a bit-flipped token is rejected with SignatureInvalid", async () => {
@@ -97,6 +97,6 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
 
     const result = await verifySpend(flipped, GOOD, publicKey);
 
-    expect(result).toEqual({ authorized: false, reason: "SignatureInvalid" });
+    expect(result).toMatchObject({ authorized: false, reason: "SignatureInvalid" });
   });
 });

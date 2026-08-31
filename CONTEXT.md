@@ -60,6 +60,10 @@ _Avoid_: payload hash, checksum, request digest
 A logical proof of the failing caveat clause, surfaced as an error, ledger note, and chat message (e.g. `Merchant Category Mismatch: expected travel, got food`).
 _Avoid_: 403, access denied, hard fail error
 
+**Rejection receipt**:
+The structured story of a denied money action — `{code, message, clause, expected, got}` — where `clause` quotes the failing Datalog check verbatim. One shape at every surface: the API error body, a `rejections` ledger row, and the chat card.
+_Avoid_: error message, rejection reason (alone), denial log
+
 ### Accounting
 
 **Ledger**:

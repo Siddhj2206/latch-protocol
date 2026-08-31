@@ -14,6 +14,9 @@ import {
   rootIdOf,
   capabilityChainId,
   intentDigest,
+  describeGateRejection,
+  type RejectionReason,
+  type RejectionReceipt,
 } from "@latch-protocol/core";
 import * as schema from "@latch-protocol/db/schema";
 import {
@@ -23,7 +26,9 @@ import {
   readEnvelope,
   registerEnvelope,
   listLedger,
+  recordRejection,
   type LedgerDB,
+  type RejectionInput,
 } from "@latch-protocol/db/ledger";
 
 import { createFakeRazorpayApi, type RazorpayApi } from "./razorpay";
@@ -44,6 +49,8 @@ export interface LatchServerOptions {
 const VerifyBody = z.object({
   token: z.string().min(1),
   merchantId: z.string().min(1),
+  /** The category the merchant offers, when it offers one (issue #5 canonical story). */
+  merchantCategory: z.string().optional(),
   spot: z.number().int().nonnegative(),
   exec: z.number().int().nonnegative(),
 });
@@ -63,6 +70,29 @@ function noDb(): Response {
     status: 503,
     headers: { "content-type": "application/json" },
   });
+}
+
+/**
+ * The denial body — one shape shared by /v1/verify and /v1/holds.
+ * An AmbiguousRejection is a retriable datalog cold-start timeout, NOT a final
+ * denial: it rides a 503 so machines can distinguish retry from give-up
+ * (the receipt still labels it, and it still lands on the ledger's deny side).
+ */
+function deniedBody(verification: { reason: RejectionReason; receipt: RejectionReceipt }) {
+  return { authorized: false, reason: verification.reason, receipt: verification.receipt };
+}
+
+function denialStatus(reason: RejectionReason): 403 | 503 {
+  return reason === "AmbiguousRejection" ? 503 : 403;
+}
+
+/** Best-effort deny-side recording: an audit-write failure never eats the caller's receipt. */
+async function recordDenial(ledger: LedgerDB, input: RejectionInput): Promise<void> {
+  try {
+    await recordRejection(ledger, input);
+  } catch {
+    // the audit trail write failed; the caller still gets the receipt
+  }
 }
 
 /**
@@ -123,7 +153,11 @@ export function createApp(opts: LatchServerOptions) {
     const { token, merchantId, spot, exec } = parsed.data;
     const result = await verifySpend(token, { merchantId, spot, exec }, rootPublicKey);
     if (result.authorized) return c.json({ authorized: true });
-    return c.json({ authorized: false, reason: result.reason }, 403);
+    // The rejection receipt rides the 403: code, the failing Datalog clause,
+    // expected vs got (issue #5). /v1/verify stays stateless — recording is
+    // the hold gate's job, so a verify-then-hold attempt is never double-counted.
+    // An AmbiguousRejection (engine cold-start timeout) is retriable: a 503.
+    return c.json(deniedBody(result), denialStatus(result.reason));
   });
 
   /**
@@ -168,6 +202,8 @@ export function createApp(opts: LatchServerOptions) {
    * POST /v1/holds — the co-sign. The edge verifies the capability (pure
    * crypto), then the ledger's hold-write is the atomic budget gate: replay
    * idempotent, step-up single-use, over-budget rejected with the remaining.
+   * Every denial — crypto or gate — returns a rejection receipt AND lands it
+   * on the ledger's deny side (issue #5); recording is best-effort.
    */
   app.post("/v1/holds", async (c) => {
     if (!ledger) return noDb();
@@ -175,11 +211,26 @@ export function createApp(opts: LatchServerOptions) {
 
     const parsed = VerifyBody.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
-    const { token, merchantId, spot, exec } = parsed.data;
+    const { token, merchantId, merchantCategory, spot, exec } = parsed.data;
 
-    const verification = await verifySpend(token, { merchantId, spot, exec }, rootPublicKey);
+    const verification = await verifySpend(
+      token,
+      { merchantId, merchantCategory, spot, exec },
+      rootPublicKey,
+    );
     if (!verification.authorized) {
-      return c.json({ authorized: false, reason: verification.reason }, 403);
+      // The hold gate is the money-action boundary: the rejection receipt is
+      // both returned AND recorded on the ledger's deny side (issue #5).
+      const digest = await intentDigest({ merchantId, execAmount: exec });
+      await recordDenial(ledger, {
+        receipt: verification.receipt,
+        rootId: rootIdOf(token, rootPublicKey) ?? undefined,
+        merchantId,
+        spotPaise: spot,
+        execPaise: exec,
+        requestDigest: digest,
+      });
+      return c.json(deniedBody(verification), denialStatus(verification.reason));
     }
 
     const rootId = rootIdOf(token, rootPublicKey)!;
@@ -215,20 +266,52 @@ export function createApp(opts: LatchServerOptions) {
         const row = await getHold(ledger, outcome.holdId);
         return c.json({ holdId: outcome.holdId, status: row?.status ?? "held", replayed: true }, 200);
       }
-      case "step-up-replayed":
+      case "step-up-replayed": {
+        const receipt = describeGateRejection("StepUpReplayed", {
+          execPaise: exec,
+          claimedByHoldId: outcome.claimedByHoldId,
+        });
+        // Gate denials land on the deny side too — every denial is one shape.
+        await recordDenial(ledger, {
+          receipt,
+          rootId: rootIdOf(token, rootPublicKey) ?? undefined,
+          merchantId,
+          spotPaise: spot,
+          execPaise: exec,
+          requestDigest: digest,
+        });
         return c.json(
-          { error: "step-up-replayed", message: "this single-use capability was already spent" },
+          {
+            error: "step-up-replayed",
+            receipt,
+            message: "this single-use capability was already spent",
+          },
           409,
         );
-      case "budget-exhausted":
+      }
+      case "budget-exhausted": {
+        const receipt = describeGateRejection("BudgetExhausted", {
+          execPaise: exec,
+          remainingPaise: outcome.remainingPaise,
+        });
+        await recordDenial(ledger, {
+          receipt,
+          rootId: rootIdOf(token, rootPublicKey) ?? undefined,
+          merchantId,
+          spotPaise: spot,
+          execPaise: exec,
+          requestDigest: digest,
+        });
         return c.json(
           {
             error: "budget-exhausted",
             remainingPaise: outcome.remainingPaise,
+            receipt,
             message: `envelope budget exhausted: remaining ${outcome.remainingPaise} paise`,
           },
           402,
         );
+      }
       case "unknown-envelope":
         return c.json(
           { error: "unknown-envelope", message: "no envelope for this root — register it from root custody first" },
@@ -326,12 +409,12 @@ export function createApp(opts: LatchServerOptions) {
     return c.json(envelope);
   });
 
-  /** GET /v1/ledger — the audit view (holds lifecycle for the /ledger dashboard). */
+  /** GET /v1/ledger — the audit view (holds lifecycle + rejection receipts). */
   app.get("/v1/ledger", async (c) => {
     if (!ledger) return noDb();
     const rootId = c.req.query("rootId");
-    const { holds: rows } = await listLedger(ledger, rootId);
-    return c.json({ holds: rows });
+    const { holds: rows, rejections } = await listLedger(ledger, rootId);
+    return c.json({ holds: rows, rejections });
   });
 
   return app;

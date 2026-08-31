@@ -213,14 +213,28 @@ describe("the two-phase flow over HTTP (Act 2)", () => {
 });
 
 describe("hold-write semantics at the edge", () => {
-  test("an over-budget hold is a 402 with the remaining", async () => {
+  test("an over-budget hold is a 402 with the remaining, a receipt, and a ledger row", async () => {
     const sw = swarm(20_000);
-    await register(sw);
+    const rootId = await register(sw);
     const res = await hold(sw, 30_000);
     expect(res.status).toBe(402);
-    const body = await readJson<{ error: string; remainingPaise: number }>(res);
+    const body = await readJson<{ error: string; remainingPaise: number; receipt: { code: string; message: string; clause: string } }>(res);
     expect(body.error).toBe("budget-exhausted");
     expect(body.remainingPaise).toBe(20_000);
+    expect(body.receipt.code).toBe("BudgetExhausted");
+    // The gate clause is the REAL predicate, not invented pseudo-Datalog.
+    expect(body.receipt.clause).toBe("envelopes budget gate (D1 SQL): spent_paise + ? <= budget_paise AND root_id = ?");
+    expect(body.receipt.message).toBe("Envelope Budget Exhausted. Expected: a spend within the ₹200.00 remaining, Got: a ₹300.00 hold");
+
+    // A gate denial lands on the ledger's deny side too (issue #5).
+    const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
+    const ledgerBody = await readJson<{ rejections: { code: string; clause: string; rootId: string | null; expected: string; got: string }[] }>(ledger);
+    expect(ledgerBody.rejections).toHaveLength(1);
+    expect(ledgerBody.rejections[0]!.code).toBe("BudgetExhausted");
+    expect(ledgerBody.rejections[0]!.clause).toBe(body.receipt.clause);
+    expect(ledgerBody.rejections[0]!.rootId).toBe(rootId);
+    expect(ledgerBody.rejections[0]!.expected).toBe("a spend within the ₹200.00 remaining");
+    expect(ledgerBody.rejections[0]!.got).toBe("a ₹300.00 hold");
   });
 
   test("a replay returns the existing hold and never reserves twice", async () => {
@@ -248,7 +262,7 @@ describe("hold-write semantics at the edge", () => {
 
   test("a step-up spend is single-use: its own bounded envelope, claimable once", async () => {
     const sw = swarm(20_000); // envelope far too small — step-up ignores it
-    await register(sw);
+    const rootId = await register(sw);
     const stepUpToken = await mintStepUp({ merchantId: "mer_sneakerhead", execAmount: 600_000 }, sw.keys.privateKey);
 
     const first = await sw.app().request("/v1/holds", {
@@ -266,8 +280,51 @@ describe("hold-write semantics at the edge", () => {
       body: JSON.stringify({ token: stepUpToken, merchantId: "mer_sneakerhead", spot: 600_000, exec: 600_000 }),
     });
     expect(replay.status).toBe(409);
-    const replayBody = await readJson<{ error: string }>(replay);
+    const replayBody = await readJson<{ error: string; receipt: { code: string; message: string } }>(replay);
     expect(replayBody.error).toBe("step-up-replayed");
+    // The precise story: the receipt names the hold that claimed the chain.
+    expect(replayBody.receipt.message).toContain(`already claimed by ${firstBody.holdId}`);
+
+    // The gate denial is recorded on the deny side — under the step-up's OWN
+    // root (a step-up is a fresh envelope root, not the swarm's).
+    const ledger = await sw.app().request("/v1/ledger");
+    const ledgerBody = await readJson<{ rejections: { code: string; message: string; rootId: string | null }[] }>(ledger);
+    const stepUpDenial = ledgerBody.rejections.find((r) => r.code === "StepUpReplayed");
+    expect(stepUpDenial?.message).toContain(`already claimed by ${firstBody.holdId}`);
+    expect(stepUpDenial?.rootId).not.toBe(rootId);
+  });
+
+  test("a category-bound capability presented at a mismatched category speaks the canonical story (Act 2)", async () => {
+    const sw = swarm();
+    const catToken = mintRoot({ ...CAPS, merchantCategory: "travel" }, sw.keys.privateKey);
+    const registered = await sw.app().request("/v1/envelopes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rootToken: catToken, budgetPaise: sw.budgetPaise }),
+    });
+    expect(registered.status).toBe(201);
+    const rootId = (await readJson<{ rootId: string }>(registered)).rootId;
+
+    const res = await sw.app().request("/v1/holds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: catToken, merchantId: "mer_evil", merchantCategory: "food", spot: 30_000, exec: 30_000 }),
+    });
+    expect(res.status).toBe(403);
+    const body = await readJson<{ reason: string; receipt: { code: string; message: string; clause: string; expected: string; got: string } }>(res);
+    expect(body.reason).toBe("AudienceMismatch");
+    // THE canonical line from CONTEXT.md / IDEA.md:
+    expect(body.receipt.message).toBe("Merchant Category Mismatch. Expected: travel, Got: food");
+    expect(body.receipt.clause).toBe("check if merchant_category($c), request_category($r), $r == $c");
+    expect(body.receipt.expected).toBe("travel");
+    expect(body.receipt.got).toBe("food");
+
+    // Recorded on the deny side, attributed to the category-bound root.
+    const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
+    const ledgerBody = await readJson<{ rejections: { code: string; message: string; rootId: string | null }[] }>(ledger);
+    expect(ledgerBody.rejections).toHaveLength(1);
+    expect(ledgerBody.rejections[0]!.message).toBe("Merchant Category Mismatch. Expected: travel, Got: food");
+    expect(ledgerBody.rejections[0]!.rootId).toBe(rootId);
   });
 
   test("a tampered spend hard-fails at the hold gate with its reason, writing nothing", async () => {
@@ -279,9 +336,43 @@ describe("hold-write semantics at the edge", () => {
       body: JSON.stringify({ token: sw.rootToken, merchantId: "mer_evil", spot: 30_000, exec: 30_000 }),
     });
     expect(res.status).toBe(403);
-    const body = await readJson<{ authorized: boolean; reason: string }>(res);
-    expect(body).toEqual({ authorized: false, reason: "AudienceMismatch" });
+    const body = await readJson<{ authorized: boolean; reason: string; receipt: { code: string; clause: string; expected: string; got: string } }>(res);
+    expect(body.authorized).toBe(false);
+    expect(body.reason).toBe("AudienceMismatch");
+    expect(body.receipt.clause).toBe("check if merchant($m), request_merchant($r), $r == $m");
+    expect(body.receipt.expected).toBe("mer_sneakerhead");
+    expect(body.receipt.got).toBe("mer_evil");
     expect(await spent(rootId)).toBe(0);
+
+    // The rejection is on the ledger's deny side, not just the 403 (issue #5).
+    const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
+    const ledgerBody = await readJson<{ rejections: { code: string; message: string; rootId: string | null }[] }>(ledger);
+    expect(ledgerBody.rejections).toHaveLength(1);
+    expect(ledgerBody.rejections[0]!.code).toBe("AudienceMismatch");
+    expect(ledgerBody.rejections[0]!.rootId).toBe(rootId);
+  });
+
+  test("a signature-invalid token is rejected AND recorded with no root id", async () => {
+    const sw = swarm();
+    const rootId = await register(sw);
+    const flipped = sw.rootToken.slice(0, 12) + (sw.rootToken[12] === "A" ? "B" : "A") + sw.rootToken.slice(13);
+    const res = await sw.app().request("/v1/holds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: flipped, merchantId: "mer_sneakerhead", spot: 30_000, exec: 30_000 }),
+    });
+    expect(res.status).toBe(403);
+    const body = await readJson<{ reason: string; receipt: { code: string; clause: string } }>(res);
+    expect(body.reason).toBe("SignatureInvalid");
+    expect(body.receipt.clause).toContain("ed25519");
+
+    const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
+    const ledgerBody = await readJson<{ rejections: { code: string; rootId: string | null }[] }>(ledger);
+    // unattributable to any root: recorded with a null root id, off the root feed
+    expect(ledgerBody.rejections).toHaveLength(0);
+    const all = await sw.app().request("/v1/ledger");
+    const allBody = await readJson<{ rejections: { code: string; rootId: string | null }[] }>(all);
+    expect(allBody.rejections.some((r) => r.code === "SignatureInvalid" && r.rootId === null)).toBe(true);
   });
 
   test("a hold on an unregistered root is a 404 with an explainable nudge", async () => {

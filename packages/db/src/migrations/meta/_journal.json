@@ -8,6 +8,13 @@
       "when": 1787728405528,
       "tag": "0000_eminent_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788068739249,
+      "tag": "0001_black_zaran",
+      "breakpoints": true
     }
   ]
 }

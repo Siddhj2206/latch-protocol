@@ -27,7 +27,7 @@ describe("step-up: the human-approved, single-use envelope", () => {
       publicKey,
     );
 
-    expect(result).toEqual({ authorized: false, reason: "IntentMismatch" });
+    expect(result).toMatchObject({ authorized: false, reason: "IntentMismatch" });
   });
 
   test("the single-use registry claims a spent step-up exactly once", async () => {

@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
+import type { RejectionReceipt } from "@latch-protocol/core";
 
 import * as schema from "./schema";
-import { holds, envelopes, singleUseClaims } from "./schema";
+import { holds, envelopes, singleUseClaims, rejections } from "./schema";
 
 export type LedgerDB = DrizzleD1Database<typeof schema>;
 export type HoldRow = typeof holds.$inferSelect;
@@ -35,7 +36,7 @@ export interface HoldInput {
 export type HoldOutcome =
   | { outcome: "held"; holdId: string }
   | { outcome: "replayed"; holdId: string }
-  | { outcome: "step-up-replayed" }
+  | { outcome: "step-up-replayed"; claimedByHoldId?: string }
   | { outcome: "budget-exhausted"; remainingPaise: number }
   | { outcome: "unknown-envelope" };
 
@@ -126,10 +127,8 @@ export async function hold(db: LedgerDB, input: HoldInput): Promise<HoldOutcome>
   if (existing) {
     // Same capability re-presented: if it carries a single-use chain, the precise
     // story is "this step-up was already spent", not a generic replay.
-    if (input.stepUp && input.stepUpChainId) {
-      const claimed = await claimRow(db, input.stepUpChainId);
-      if (claimed) return { outcome: "step-up-replayed" };
-    }
+    const replayed = await claimedStepUpReplay(db, input);
+    if (replayed) return replayed;
     return { outcome: "replayed", holdId: existing.id };
   }
 
@@ -222,15 +221,13 @@ export async function hold(db: LedgerDB, input: HoldInput): Promise<HoldOutcome>
   // Nothing was written (the batch is atomic): classify why.
   const replay = await findReplay(db, input);
   if (replay) {
-    if (input.stepUp && input.stepUpChainId && (await claimRow(db, input.stepUpChainId))) {
-      return { outcome: "step-up-replayed" };
-    }
+    const replayed = await claimedStepUpReplay(db, input);
+    if (replayed) return replayed;
     return { outcome: "replayed", holdId: replay.id };
   }
 
-  if (input.stepUp && input.stepUpChainId) {
-    if (await claimRow(db, input.stepUpChainId)) return { outcome: "step-up-replayed" };
-  }
+  const replayed = await claimedStepUpReplay(db, input);
+  if (replayed) return replayed;
 
   const envelope = await db.select().from(envelopes).where(eq(envelopes.rootId, input.rootId)).get();
   if (!envelope) return { outcome: "unknown-envelope" };
@@ -243,6 +240,20 @@ async function claimRow(db: LedgerDB, capabilityChainId: string) {
     .from(singleUseClaims)
     .where(eq(singleUseClaims.capabilityChainId, capabilityChainId))
     .get();
+}
+
+/**
+ * The one place "was this step-up already spent?" is classified (ADR-0002):
+ * a re-presented single-use capability names the hold that claimed its chain.
+ * Returns null when the capability isn't a step-up or nothing claims it yet.
+ */
+async function claimedStepUpReplay(
+  db: LedgerDB,
+  input: Pick<HoldInput, "stepUp" | "stepUpChainId">,
+): Promise<HoldOutcome | null> {
+  if (!input.stepUp || !input.stepUpChainId) return null;
+  const claimed = await claimRow(db, input.stepUpChainId);
+  return claimed ? { outcome: "step-up-replayed", claimedByHoldId: claimed.holdId } : null;
 }
 
 /**
@@ -451,5 +462,45 @@ export async function registerEnvelope(
 export async function listLedger(db: LedgerDB, rootId?: string) {
   const where = rootId ? eq(holds.rootId, rootId) : undefined;
   const holdRows = await db.select().from(holds).where(where).orderBy(holds.createdAt).all();
-  return { holds: holdRows };
+  return { holds: holdRows, rejections: await listRejections(db, rootId) };
+}
+
+/**
+ * Record a rejection receipt (issue #5): the deny side of the audit trail,
+ * written at the hold gate — the money-action boundary. Returns the receipt id.
+ */
+export async function recordRejection(db: LedgerDB, input: RejectionInput): Promise<string> {
+  const id = `rej_${crypto.randomUUID()}`;
+  await db.insert(rejections).values({
+    id,
+    code: input.receipt.code,
+    message: input.receipt.message,
+    clause: input.receipt.clause,
+    expected: input.receipt.expected,
+    got: input.receipt.got,
+    rootId: input.rootId ?? null,
+    merchantId: input.merchantId,
+    spotPaise: input.spotPaise,
+    execPaise: input.execPaise,
+    requestDigest: input.requestDigest,
+    createdAt: now(),
+  });
+  return id;
+}
+
+export interface RejectionInput {
+  /** The receipt that was returned to the caller — the one core shape, no drifted copy. */
+  receipt: RejectionReceipt;
+  /** Null for a signature-invalid token: no trustworthy root id exists. */
+  rootId?: string;
+  merchantId: string;
+  spotPaise: number;
+  execPaise: number;
+  requestDigest: string;
+}
+
+/** The denial feed for the ledger dashboard, newest first. */
+export async function listRejections(db: LedgerDB, rootId?: string) {
+  const where = rootId ? eq(rejections.rootId, rootId) : undefined;
+  return db.select().from(rejections).where(where).orderBy(desc(rejections.createdAt)).all();
 }

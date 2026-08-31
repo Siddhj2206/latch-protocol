@@ -51,6 +51,9 @@ lerna-debug.log*
 coverage
 .nyc_output
 
+# Agent scratch (review reports, spec drafts) — never committed
+.scratch
+
 # Misc
 *.tgz
 .cache

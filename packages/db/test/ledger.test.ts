@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import path from "node:path";
 
 import * as schema from "../src/schema";
+import type { RejectionReceipt } from "@latch-protocol/core";
 import {
   hold,
   executeHold,
@@ -15,6 +16,7 @@ import {
   refund,
   readEnvelope,
   listLedger,
+  recordRejection,
   type HoldInput,
 } from "../src/ledger";
 
@@ -300,5 +302,62 @@ describe("reads", () => {
 
     const ledger = await listLedger(db, rootId);
     expect(ledger.holds.some((h) => h.id === holdId)).toBe(true);
+  });
+});
+
+describe("rejection receipts (issue #5): the audit trail's deny side", () => {
+  test("a recorded rejection is readable off the ledger, newest first", async () => {
+    const rootId = await seedEnvelope();
+    const receipt: RejectionReceipt = {
+      code: "IntentMismatch",
+      message: "Intent Hash Mismatch. Expected: a8e575eab2a7… (the committed spend), Got: 9f8e7d6c5b4a… (this request)",
+      clause: "check if intent($i), request_digest($d), $d == $i",
+      expected: "a8e575eab2a716e682f2e18693f9c901dcec4ea40feb50f5ff584627c2eb9523",
+      got: "9f8e7d6c5b4a38271605f4e3d2c1b0a9988776655443322110ffeeddccbbaa99",
+    };
+    await recordRejection(db, {
+      receipt,
+      rootId,
+      merchantId: MERCHANT,
+      spotPaise: 600_000,
+      execPaise: 700_000,
+      requestDigest: receipt.got,
+    });
+    await recordRejection(db, {
+      receipt: { ...receipt, code: "AmountCapExceeded", message: "Per-Transaction Cap Exceeded. …" },
+      merchantId: MERCHANT,
+      spotPaise: 51_000,
+      execPaise: 51_000,
+      requestDigest: receipt.got,
+    });
+
+    const ledger = await listLedger(db, rootId);
+    expect(ledger.rejections).toHaveLength(1);
+    const row = ledger.rejections[0]!;
+    expect(row).toMatchObject({
+      code: "IntentMismatch",
+      rootId,
+      merchantId: MERCHANT,
+      spotPaise: 600_000,
+      execPaise: 700_000,
+      requestDigest: receipt.got,
+      clause: receipt.clause,
+      expected: receipt.expected,
+      got: receipt.got,
+    });
+    expect(row.id).toMatch(/^rej_/);
+  });
+
+  test("the step-up replay names the hold that claimed the chain", async () => {
+    const input = holdInput(await seedEnvelope(), "digest-replay-claim", {
+      stepUp: true,
+      stepUpChainId: "chain-replay-claim",
+    });
+    const first = await hold(db, input);
+    expect(first.outcome).toBe("held");
+    const firstHoldId = (first as { outcome: "held"; holdId: string }).holdId;
+
+    const replay = await hold(db, input);
+    expect(replay).toEqual({ outcome: "step-up-replayed", claimedByHoldId: firstHoldId });
   });
 });

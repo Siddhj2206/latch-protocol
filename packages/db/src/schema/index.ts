@@ -104,3 +104,28 @@ export const webhookEvents = sqliteTable("webhook_events", {
   holdId: text("hold_id").references(() => holds.id),
   processedAt: integer("processed_at").notNull(),
 });
+
+/**
+ * Rejection receipts (the audit trail's deny side, issue #5): every rejected
+ * money action is recorded at the hold gate with the receipt it returned —
+ * code, human line, failing clause, expected vs got. A rejection is part of
+ * the ledger's story, not a silent 403.
+ *
+ * `rootId` is nullable: a signature-invalid token has no trustworthy root id
+ * (the presented bytes are attacker-controlled), and none is recorded for it.
+ */
+export const rejections = sqliteTable("rejections", {
+  id: text("id").primaryKey(),
+  code: text("code").notNull(),
+  message: text("message").notNull(),
+  clause: text("clause").notNull(),
+  expected: text("expected").notNull(),
+  got: text("got").notNull(),
+  rootId: text("root_id"),
+  merchantId: text("merchant_id").notNull(),
+  spotPaise: integer("spot_paise").notNull(),
+  execPaise: integer("exec_paise").notNull(),
+  /** The digest computed over the rejected request (what "got" hashes to). */
+  requestDigest: text("request_digest").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
