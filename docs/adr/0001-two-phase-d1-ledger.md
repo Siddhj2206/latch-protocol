@@ -47,6 +47,7 @@ Known gap (deferred seams): the payment-initiation and `payment.authorized → P
 ### Co-signing
 
 Auth and spend are two independent gates, defense-in-depth:
+
 - the **edge verifier** is pure token math (signature, caveats, intent hash) — no database;
 - the **hold-write** is the second signature: an atomic budget check that makes replay, over-spend, and step-up reuse impossible **within one D1 region**.
 

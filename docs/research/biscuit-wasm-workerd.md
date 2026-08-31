@@ -39,6 +39,7 @@ Same bundle, `wrangler dev --local` (wrangler 4.125.0, running the real workerd 
 GET /crypto    -> {"cryptoFallback":"function","filled":true}          (200)
 GET /smoke     -> {"ok":true}                                           (200)
 ```
+
 `/smoke` runs the **complete mint → attenuate → verify** pipeline: `generateKeyPair()` (RNG), `.build(sk)`, `token.appendBlock(...)` (which internally calls `KeyPair::new` again — see §4 for proof), `authorizer…buildAuthenticated(restricted).authorize()`. All four loss-check caveats exercised with the expected pass/fail outcomes (see §3).
 
 ### 1.5 Verified sharp edge A: module/global-scope keygen deterministically crashes workerd
@@ -112,7 +113,9 @@ Verified end-to-end under **bun (Node path, shim-node)** and **workerd (shim, in
 cd /tmp/opencode/biscuit-smoke
 bun add @smithery/biscuit@1.0.1        # -> dep @biscuit-auth/biscuit-wasm@0.6.0
 ```
+
 **Required consumer-side fix (the shipped tarball doesn't include it):** add the two subpaths to the upstream `exports`, mirroring the repo's patch:
+
 ```jsonc
 // node_modules/@biscuit-auth/biscuit-wasm/package.json
 "exports": {
@@ -121,14 +124,16 @@ bun add @smithery/biscuit@1.0.1        # -> dep @biscuit-auth/biscuit-wasm@0.6.0
   "./module/biscuit_bg.wasm": "./module/biscuit_bg.wasm"
 }
 ```
+
 (pnpm consumers can carry the same as `pnpm.patchedDependencies`; bun/npm/yarn have no patched-dependencies support, so it must be applied to `node_modules` or via a build alias. This is a mechanical fact, not a recommendation.)
 
 ### 3.1 Imports and init
 
 ```ts
 import { biscuit, authorizer, block, generateKeyPair } from "@smithery/biscuit";
-const { privateKey } = generateKeyPair();   // workerd: MUST be inside a handler, never module scope (§1.5)
+const { privateKey } = generateKeyPair(); // workerd: MUST be inside a handler, never module scope (§1.5)
 ```
+
 No manual wasm init — the shim instantiates on import. Tagged-template interpolation gotcha (verified): `${…}` inserts **terms**, never code — a whole-datalog-snippet interpolation becomes `{param_0}` at statement position and fails to parse (`Language: ParseError`, input `{param_0} allow if true`). Write datalog literally; parameterize only values.
 
 ### 3.2 Mint (authority block)
@@ -144,7 +149,7 @@ const token = biscuit`
   // 1. per-transaction amount cap
   check if amount_cap($c), amount($a), $a <= $c;
   // 2. audience/merchant binding
-  check if resource($r), $r == ${ "orders/123" };
+  check if resource($r), $r == ${"orders/123"};
   // 3. delegation-depth bound (user-space: verifier supplies hops($n))
   check if max_hops($h), hops($n), $n <= $h;
   // 4. slippage / variance check
@@ -158,7 +163,7 @@ const token = biscuit`
 const restricted = token.appendBlock(
   block`
     check if amount($a), $a <= 150;                        // tightens cap 200 -> 150
-    check if resource($r), $r == ${ "orders/123/shipment" }; // narrows binding
+    check if resource($r), $r == ${"orders/123/shipment"}; // narrows binding
   `,
 );
 ```
@@ -167,15 +172,18 @@ const restricted = token.appendBlock(
 
 ```ts
 authorizer`
-  amount(${ 90 });
-  resource(${ "orders/123/shipment" });
+  amount(${90});
+  resource(${"orders/123/shipment"});
   operation("read");
-  hops(${ 2 });          // verifier-injected delegation depth (block count - 1, or policy)
-  spot(${ 100 });
-  exec(${ 102 });
+  hops(${2});          // verifier-injected delegation depth (block count - 1, or policy)
+  spot(${100});
+  exec(${102});
   allow if true;
-`.buildAuthenticated(restricted).authorize();
+`
+  .buildAuthenticated(restricted)
+  .authorize();
 ```
+
 `authorize()` throws on any failed check. Verified outcomes (bun + workerd): amount 90 → **AUTHORIZED**; amount 160 → blocked (cap 150); resource `orders/999` → blocked (binding); `hops(4)` → blocked (depth bound); `exec(108)` with `spot(100) + max_delta(5)` → blocked (slippage); unattenuated token + amount 160 → allowed (root cap 200).
 
 ### 3.5 The delegation-depth caveat — no builtin `depth()` exists
@@ -190,21 +198,21 @@ authorizer`
 
 Scratch: `/tmp/opencode/biscuit-smoke` (nothing in the repo was modified; no git commands run).
 
-| # | Command | Result (excerpt) |
-|---|---|---|
-| 1 | `bun add @smithery/biscuit@1.0.1` | `installed @smithery/biscuit@1.0.1` |
-| 2 | `bun run resolve-test.ts` (upstream unpatched) | `error: Cannot find module '@biscuit-auth/biscuit-wasm/module/biscuit_bg.js' from '.../dist/shim-node.js'` |
-| 3 | apply upstream-exports patch (§3.0) → `bun run resolve-test.ts` | `RESOLVED @smithery/biscuit OK; exports: function function function function` |
-| 4 | `bun run roundtrip.ts` | `minted. blocks: 1 · len: 684` / `attenuated. blocks: 2 · len: 968` / `[ok] … AUTHORIZED` / `[blocked]` ×4 / `[info] amount 160 unattenuated … as expected` |
-| 5 | `bunx wrangler deploy --dry-run` (upstream unpatched, workerd shim) | `ERROR Could not resolve "@biscuit-auth/biscuit-wasm/module/biscuit_bg.js" … not exported by package` |
-| 6 | worker with module-scope `generateKeyPair()`, `wrangler dev --local` | `panicked at src/crypto.rs:215:41: … "Calling Web API crypto.getRandomValues failed"` → `Uncaught RuntimeError: unreachable` → "Workers runtime failed to start" |
-| 7 | same worker, module-scope only `crypto.getRandomValues(new Uint8Array(8))` | `"probe":"PLAIN-getRandomValues-FAILED: Error: Disallowed operation called within global scope. … generating random values are not allowed within global scope. … https://developers.cloudflare.com/workers/runtime-apis/handlers/"` |
-| 8 | worker with handler-scope biscuit, fresh `wrangler dev --local`, curls | `GET /crypto 200 {"cryptoFallback":"function","filled":true}` · `GET /fixedkey 500 {"RunLimit":"Timeout"}` (cold) · `GET /smoke 200 {"ok":true}` · then `GET /fixedkey 200 {"ok":true,"pub":"ed25519/41e77e842e5c952a29233992dc8ebbedd2d83291a89bb0eec34457e723a69526"}` |
-| 9 | official package worker, `wrangler deploy --dry-run` | `Total Upload: 2373.00 KiB / gzip: 844.98 KiB` (bundles) |
-| 10 | official package worker, `wrangler dev --local` | `Uncaught TypeError: wasm2.__wbindgen_start is not a function at index.js:2247:7` → "runtime failed to start" |
-| 11 | official package, `bun run official-bun.ts` | `TypeError: wasm.__wbindgen_start is not a function … module/biscuit.js:5:6` |
-| 12 | official package, `node --experimental-wasm-modules official-node2.ts` (v26.7.0) | `roundtrip #1: FAIL -> {"RunLimit":"Timeout"}` / `#2: OK` / `#3: OK` |
-| 13 | fixed-seed key path, workerd (warm) | `GET /fixedkey 200 {"ok":true,"pub":"ed25519/…"}` — `PrivateKey.fromString("ed25519-private/…")`, `KeyPair.fromPrivateKey`, `.build(sk)` |
+| #   | Command                                                                          | Result (excerpt)                                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `bun add @smithery/biscuit@1.0.1`                                                | `installed @smithery/biscuit@1.0.1`                                                                                                                                                                                                                                      |
+| 2   | `bun run resolve-test.ts` (upstream unpatched)                                   | `error: Cannot find module '@biscuit-auth/biscuit-wasm/module/biscuit_bg.js' from '.../dist/shim-node.js'`                                                                                                                                                               |
+| 3   | apply upstream-exports patch (§3.0) → `bun run resolve-test.ts`                  | `RESOLVED @smithery/biscuit OK; exports: function function function function`                                                                                                                                                                                            |
+| 4   | `bun run roundtrip.ts`                                                           | `minted. blocks: 1 · len: 684` / `attenuated. blocks: 2 · len: 968` / `[ok] … AUTHORIZED` / `[blocked]` ×4 / `[info] amount 160 unattenuated … as expected`                                                                                                              |
+| 5   | `bunx wrangler deploy --dry-run` (upstream unpatched, workerd shim)              | `ERROR Could not resolve "@biscuit-auth/biscuit-wasm/module/biscuit_bg.js" … not exported by package`                                                                                                                                                                    |
+| 6   | worker with module-scope `generateKeyPair()`, `wrangler dev --local`             | `panicked at src/crypto.rs:215:41: … "Calling Web API crypto.getRandomValues failed"` → `Uncaught RuntimeError: unreachable` → "Workers runtime failed to start"                                                                                                         |
+| 7   | same worker, module-scope only `crypto.getRandomValues(new Uint8Array(8))`       | `"probe":"PLAIN-getRandomValues-FAILED: Error: Disallowed operation called within global scope. … generating random values are not allowed within global scope. … https://developers.cloudflare.com/workers/runtime-apis/handlers/"`                                     |
+| 8   | worker with handler-scope biscuit, fresh `wrangler dev --local`, curls           | `GET /crypto 200 {"cryptoFallback":"function","filled":true}` · `GET /fixedkey 500 {"RunLimit":"Timeout"}` (cold) · `GET /smoke 200 {"ok":true}` · then `GET /fixedkey 200 {"ok":true,"pub":"ed25519/41e77e842e5c952a29233992dc8ebbedd2d83291a89bb0eec34457e723a69526"}` |
+| 9   | official package worker, `wrangler deploy --dry-run`                             | `Total Upload: 2373.00 KiB / gzip: 844.98 KiB` (bundles)                                                                                                                                                                                                                 |
+| 10  | official package worker, `wrangler dev --local`                                  | `Uncaught TypeError: wasm2.__wbindgen_start is not a function at index.js:2247:7` → "runtime failed to start"                                                                                                                                                            |
+| 11  | official package, `bun run official-bun.ts`                                      | `TypeError: wasm.__wbindgen_start is not a function … module/biscuit.js:5:6`                                                                                                                                                                                             |
+| 12  | official package, `node --experimental-wasm-modules official-node2.ts` (v26.7.0) | `roundtrip #1: FAIL -> {"RunLimit":"Timeout"}` / `#2: OK` / `#3: OK`                                                                                                                                                                                                     |
+| 13  | fixed-seed key path, workerd (warm)                                              | `GET /fixedkey 200 {"ok":true,"pub":"ed25519/…"}` — `PrivateKey.fromString("ed25519-private/…")`, `KeyPair.fromPrivateKey`, `.build(sk)`                                                                                                                                 |
 
 ---
 

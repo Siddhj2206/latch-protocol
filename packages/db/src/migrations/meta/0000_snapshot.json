@@ -163,11 +163,7 @@
       "indexes": {
         "holds_replay_key": {
           "name": "holds_replay_key",
-          "columns": [
-            "root_id",
-            "intent_digest",
-            "exec_paise"
-          ],
+          "columns": ["root_id", "intent_digest", "exec_paise"],
           "isUnique": true
         }
       },
@@ -235,12 +231,8 @@
           "name": "journal_hold_id_holds_id_fk",
           "tableFrom": "journal",
           "tableTo": "holds",
-          "columnsFrom": [
-            "hold_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hold_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -280,12 +272,8 @@
           "name": "single_use_claims_hold_id_holds_id_fk",
           "tableFrom": "single_use_claims",
           "tableTo": "holds",
-          "columnsFrom": [
-            "hold_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hold_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -339,12 +327,8 @@
           "name": "webhook_events_hold_id_holds_id_fk",
           "tableFrom": "webhook_events",
           "tableTo": "holds",
-          "columnsFrom": [
-            "hold_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hold_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

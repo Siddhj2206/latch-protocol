@@ -1,7 +1,21 @@
-import { authorizer, biscuit, block, generateKeyPair, PublicKey, Biscuit, Rule, SignatureAlgorithm } from "@smithery/biscuit";
+import {
+  authorizer,
+  biscuit,
+  block,
+  generateKeyPair,
+  PublicKey,
+  Biscuit,
+  Rule,
+  SignatureAlgorithm,
+} from "@smithery/biscuit";
 import type { Authorizer, PrivateKey } from "@biscuit-auth/biscuit-wasm";
 import { bytesToHex } from "./ids";
-import { describeRejection, type RejectionContext, type RejectionReceipt, type RejectionReason } from "./rejection";
+import {
+  describeRejection,
+  type RejectionContext,
+  type RejectionReceipt,
+  type RejectionReason,
+} from "./rejection";
 
 export { generateKeyPair, PublicKey, SignatureAlgorithm };
 export type { PrivateKey };
@@ -11,7 +25,12 @@ export {
   describeGateRejection,
   formatInr,
 } from "./rejection";
-export type { RejectionReceipt, RejectionReason, RejectionCode, RejectionContext } from "./rejection";
+export type {
+  RejectionReceipt,
+  RejectionReason,
+  RejectionCode,
+  RejectionContext,
+} from "./rejection";
 
 export interface EnvelopeCaps {
   /** Maximum committed (spot) amount, in paise. */
@@ -261,7 +280,7 @@ export async function verifySpend(
     request_digest(${digest});
     allow if true;
   `
-).buildAuthenticated(parsed);
+  ).buildAuthenticated(parsed);
 
   // A cold-start datalog budget exhaustion (research §1.6) is a retriable quirk,
   // not a rejection: try once more with a larger time budget before attributing.
@@ -288,7 +307,11 @@ export async function verifySpend(
     };
   }
   const attributed = attributeRejection(auth, facts, hops, digest, parsed);
-  return { authorized: false, reason: attributed.reason, receipt: describeRejection(attributed.reason, attributed.ctx) };
+  return {
+    authorized: false,
+    reason: attributed.reason,
+    receipt: describeRejection(attributed.reason, attributed.ctx),
+  };
 }
 
 /** Read a single fact of the form `name($var)` from the token via a datalog query. */
@@ -392,7 +415,13 @@ function attributeRejection(
   // A token without an intent block can never intent-mismatch — if the pinned
   // digest is unreadable, the attribution itself failed (cold-start probe):
   // report the honest "unknown" instead of blaming intent.
-  if (!capViolation && !categoryViolation && !merchantViolation && !hopsViolation && !slipViolated) {
+  if (
+    !capViolation &&
+    !categoryViolation &&
+    !merchantViolation &&
+    !hopsViolation &&
+    !slipViolated
+  ) {
     if (pinned === undefined) return { reason: "AmbiguousRejection", ctx };
     return { reason: "IntentMismatch", ctx: { ...ctx, intentDigest: pinned } };
   }

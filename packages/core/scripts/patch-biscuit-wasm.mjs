@@ -35,7 +35,14 @@ function findPackageJson(startDir) {
     const entries = readdirSafe(bunStore);
     for (const e of entries) {
       if (e.startsWith("@biscuit-auth+biscuit-wasm@")) {
-        const p = join(bunStore, e, "node_modules", "@biscuit-auth", "biscuit-wasm", "package.json");
+        const p = join(
+          bunStore,
+          e,
+          "node_modules",
+          "@biscuit-auth",
+          "biscuit-wasm",
+          "package.json",
+        );
         if (existsSync(p)) return p;
       }
     }
@@ -56,7 +63,9 @@ function readdirSafe(d) {
 
 const file = findPackageJson(dirname(fileURLToPath(import.meta.url)));
 if (!file) {
-  console.warn("[patch-biscuit-wasm] NOT FOUND: @biscuit-auth/biscuit-wasm — run `bun install` first, then re-run this script");
+  console.warn(
+    "[patch-biscuit-wasm] NOT FOUND: @biscuit-auth/biscuit-wasm — run `bun install` first, then re-run this script",
+  );
   process.exit(0);
 }
 

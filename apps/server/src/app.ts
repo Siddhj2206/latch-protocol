@@ -32,7 +32,13 @@ import {
 } from "@latch-protocol/db/ledger";
 
 import { createFakeRazorpayApi, type RazorpayApi } from "./razorpay";
-import { applyRazorpayEvent, hmacSha256Hex, parseRazorpayEvent, signaturesEqual, valveEvent } from "./webhook";
+import {
+  applyRazorpayEvent,
+  hmacSha256Hex,
+  parseRazorpayEvent,
+  signaturesEqual,
+  valveEvent,
+} from "./webhook";
 
 export interface LatchServerOptions {
   corsOrigin: string;
@@ -176,12 +182,18 @@ export function createApp(opts: LatchServerOptions) {
 
     const facts = await readEnvelopeFacts(rootToken, rootPublicKey);
     if (!facts) {
-      return c.json({ error: "invalid-capability", message: "not a latch capability under the pinned root" }, 403);
+      return c.json(
+        { error: "invalid-capability", message: "not a latch capability under the pinned root" },
+        403,
+      );
     }
     const chain = capabilityChainId(rootToken, rootPublicKey);
     if (!chain || chain.includes(".")) {
       return c.json(
-        { error: "not-a-root", message: "only root-key custody mints envelopes; attenuation cannot" },
+        {
+          error: "not-a-root",
+          message: "only root-key custody mints envelopes; attenuation cannot",
+        },
         400,
       );
     }
@@ -251,20 +263,28 @@ export function createApp(opts: LatchServerOptions) {
       spotPaise: spot,
       execPaise: exec,
       stepUp,
-      stepUpChainId: stepUp ? chain ?? undefined : undefined,
+      stepUpChainId: stepUp ? (chain ?? undefined) : undefined,
     });
 
     switch (outcome.outcome) {
       case "held": {
         const envelope = await readEnvelope(ledger, rootId);
         return c.json(
-          { holdId: outcome.holdId, status: "held", stepUp, remainingPaise: envelope?.remainingPaise ?? null },
+          {
+            holdId: outcome.holdId,
+            status: "held",
+            stepUp,
+            remainingPaise: envelope?.remainingPaise ?? null,
+          },
           201,
         );
       }
       case "replayed": {
         const row = await getHold(ledger, outcome.holdId);
-        return c.json({ holdId: outcome.holdId, status: row?.status ?? "held", replayed: true }, 200);
+        return c.json(
+          { holdId: outcome.holdId, status: row?.status ?? "held", replayed: true },
+          200,
+        );
       }
       case "step-up-replayed": {
         const receipt = describeGateRejection("StepUpReplayed", {
@@ -314,7 +334,10 @@ export function createApp(opts: LatchServerOptions) {
       }
       case "unknown-envelope":
         return c.json(
-          { error: "unknown-envelope", message: "no envelope for this root — register it from root custody first" },
+          {
+            error: "unknown-envelope",
+            message: "no envelope for this root — register it from root custody first",
+          },
           404,
         );
     }
@@ -354,7 +377,11 @@ export function createApp(opts: LatchServerOptions) {
    */
   app.post("/v1/webhooks/razorpay", async (c) => {
     if (!ledger) return noDb();
-    if (!webhookSecret) return c.json({ error: "no-webhook-secret", message: "webhook listener fails closed without a secret" }, 503);
+    if (!webhookSecret)
+      return c.json(
+        { error: "no-webhook-secret", message: "webhook listener fails closed without a secret" },
+        503,
+      );
 
     const raw = await c.req.text();
     const signature = c.req.header("x-razorpay-signature");
@@ -396,9 +423,17 @@ export function createApp(opts: LatchServerOptions) {
     if (!row) return c.json({ error: "not-found", holdId }, 404);
 
     const evt = valveEvent(row, event);
-    const signature = webhookSecret ? await hmacSha256Hex(JSON.stringify(evt), webhookSecret) : null;
+    const signature = webhookSecret
+      ? await hmacSha256Hex(JSON.stringify(evt), webhookSecret)
+      : null;
     const outcome = await applyRazorpayEvent(ledger, evt);
-    return c.json({ simulated: true, event: evt.type, eventId: evt.eventId, outcome: outcome.outcome, signature });
+    return c.json({
+      simulated: true,
+      event: evt.type,
+      eventId: evt.eventId,
+      outcome: outcome.outcome,
+      signature,
+    });
   });
 
   /** GET /v1/envelopes/:rootId — the `remaining` read any capability may make. */

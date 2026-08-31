@@ -16,11 +16,11 @@ Two constraints shaped the answer: the edge verifier is **pure stateless crypto*
 
 ```ts
 interface RejectionReceipt {
-  code: string;      // stable machine code, e.g. "IntentMismatch"
-  message: string;   // one human line: "Intent Hash Mismatch. Expected: 3f79bb7b…, Got: 894fb350…"
-  clause: string;    // the failing check, VERBATIM: "check if intent($i), request_digest($d), $d == $i"
-  expected: string;  // what the caveat (or gate) demanded
-  got: string;       // what the presentation offered
+  code: string; // stable machine code, e.g. "IntentMismatch"
+  message: string; // one human line: "Intent Hash Mismatch. Expected: 3f79bb7b…, Got: 894fb350…"
+  clause: string; // the failing check, VERBATIM: "check if intent($i), request_digest($d), $d == $i"
+  expected: string; // what the caveat (or gate) demanded
+  got: string; // what the presentation offered
 }
 ```
 

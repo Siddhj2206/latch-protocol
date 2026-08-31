@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { generateKeyPair, mintRoot, attenuate, rootIdOf, readEnvelopeFacts } from "../src/index";
 
-const CAPS = { perTxCap: 50_000, merchantId: "mer_sneakerhead", maxHops: 2, maxDeltaPct: 5 } as const;
+const CAPS = {
+  perTxCap: 50_000,
+  merchantId: "mer_sneakerhead",
+  maxHops: 2,
+  maxDeltaPct: 5,
+} as const;
 
 describe("envelope identity (root id)", () => {
   test("a root token yields a stable root id", () => {

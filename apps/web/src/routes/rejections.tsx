@@ -21,7 +21,8 @@ const BEATS: { narration: string; receipt: RejectionReceipt }[] = [
       "Act 2 — the agent's UPI Lite capability is capped at ₹500 per transaction. The order asks ₹510: the amount_cap clause names both sides.",
     receipt: {
       code: "AmountCapExceeded",
-      message: "Per-Transaction Cap Exceeded. Expected: at most ₹500.00, Got: ₹510.00 (committed spot)",
+      message:
+        "Per-Transaction Cap Exceeded. Expected: at most ₹500.00, Got: ₹510.00 (committed spot)",
       clause: "check if amount_cap($c), spot($s), $s <= $c",
       expected: "at most ₹500.00",
       got: "₹510.00 (committed spot)",
@@ -57,9 +58,9 @@ function RejectionsComponent() {
     <div className="container mx-auto max-w-2xl px-4 py-6">
       <h1 className="text-lg font-medium">Explainable rejections</h1>
       <p className="mt-1 text-xs text-muted-foreground">
-        Every denial is a receipt — the failing Datalog clause, expected vs got, one human line.
-        The same shape is returned by <code className="font-mono">POST /v1/holds</code>, recorded on
-        the D1 ledger, and rendered here in chat.
+        Every denial is a receipt — the failing Datalog clause, expected vs got, one human line. The
+        same shape is returned by <code className="font-mono">POST /v1/holds</code>, recorded on the
+        D1 ledger, and rendered here in chat.
       </p>
       <div className="mt-6 grid gap-6">
         {BEATS.map(({ narration, receipt }) => (

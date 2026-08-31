@@ -70,11 +70,19 @@ beforeAll(async () => {
 });
 
 async function spent(rootId: string): Promise<number> {
-  const env = await db.select().from(schema.envelopes).where(sql`root_id = ${rootId}`).get();
+  const env = await db
+    .select()
+    .from(schema.envelopes)
+    .where(sql`root_id = ${rootId}`)
+    .get();
   return env?.spentPaise ?? -1;
 }
 
-async function heldHoldId(rootId: string, digest: string, over: Partial<HoldInput> = {}): Promise<string> {
+async function heldHoldId(
+  rootId: string,
+  digest: string,
+  over: Partial<HoldInput> = {},
+): Promise<string> {
   const result = await hold(db, holdInput(rootId, digest, over));
   expect(result.outcome).toBe("held");
   return (result as { outcome: "held"; holdId: string }).holdId;
@@ -90,7 +98,7 @@ describe("hold — the atomic budget gate", () => {
 
     const rows = await db.select().from(schema.journal).all();
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => `${r.account}:${r.direction}:${r.amountPaise}`).sort()).toEqual([
+    expect(rows.map((r) => `${r.account}:${r.direction}:${r.amountPaise}`).toSorted()).toEqual([
       "envelope:debit:30000",
       "escrow:credit:30000",
     ]);
@@ -102,9 +110,17 @@ describe("hold — the atomic budget gate", () => {
 
     expect(result.outcome).toBe("budget-exhausted");
     expect(await spent(rootId)).toBe(0);
-    const holdRows = await db.select().from(schema.holds).where(sql`root_id = ${rootId}`).all();
+    const holdRows = await db
+      .select()
+      .from(schema.holds)
+      .where(sql`root_id = ${rootId}`)
+      .all();
     expect(holdRows).toHaveLength(0);
-    const journalRows = await db.select().from(schema.journal).where(sql`hold_id IN (SELECT id FROM holds WHERE root_id = ${rootId})`).all();
+    const journalRows = await db
+      .select()
+      .from(schema.journal)
+      .where(sql`hold_id IN (SELECT id FROM holds WHERE root_id = ${rootId})`)
+      .all();
     expect(journalRows).toHaveLength(0);
   });
 
@@ -121,7 +137,11 @@ describe("hold — the atomic budget gate", () => {
     expect(first.outcome).toBe("held");
     expect(replay.outcome).toBe("replayed");
     expect(await spent(rootId)).toBe(30_000);
-    const rows = await db.select().from(schema.holds).where(sql`root_id = ${rootId}`).all();
+    const rows = await db
+      .select()
+      .from(schema.holds)
+      .where(sql`root_id = ${rootId}`)
+      .all();
     expect(rows).toHaveLength(1);
   });
 
@@ -132,7 +152,7 @@ describe("hold — the atomic budget gate", () => {
       hold(db, holdInput(rootId, "digest-race")),
     ]);
 
-    const outcomes = [a.outcome, b.outcome].sort();
+    const outcomes = [a.outcome, b.outcome].toSorted();
     expect(outcomes).toEqual(["held", "replayed"]);
     expect(await spent(rootId)).toBe(30_000);
   });
@@ -170,9 +190,17 @@ describe("hold — the atomic budget gate", () => {
 
     expect(first.outcome).toBe("held");
     expect(divergent.outcome).toBe("step-up-replayed");
-    const holdRows = await db.select().from(schema.holds).where(sql`root_id = ${rootId}`).all();
+    const holdRows = await db
+      .select()
+      .from(schema.holds)
+      .where(sql`root_id = ${rootId}`)
+      .all();
     expect(holdRows).toHaveLength(1);
-    const claims = await db.select().from(schema.singleUseClaims).where(sql`capability_chain_id = 'chain-div-1'`).all();
+    const claims = await db
+      .select()
+      .from(schema.singleUseClaims)
+      .where(sql`capability_chain_id = 'chain-div-1'`)
+      .all();
     expect(claims).toHaveLength(1);
   });
 });
@@ -214,10 +242,18 @@ describe("the lifecycle: execute -> capture -> void/refund", () => {
     });
     expect(dup.outcome).toBe("duplicate");
 
-    const settle = await db.select().from(schema.journal).where(sql`kind = 'capture'`).all();
+    const settle = await db
+      .select()
+      .from(schema.journal)
+      .where(sql`kind = 'capture'`)
+      .all();
     expect(settle).toHaveLength(2);
     expect(await db.select().from(schema.webhookEvents).all()).toHaveLength(1);
-    const event = await db.select().from(schema.webhookEvents).where(sql`event_id = 'evt_cap_1'`).get();
+    const event = await db
+      .select()
+      .from(schema.webhookEvents)
+      .where(sql`event_id = 'evt_cap_1'`)
+      .get();
     expect(event?.entityId).toBe("pay_cap_1");
   });
 
@@ -226,11 +262,20 @@ describe("the lifecycle: execute -> capture -> void/refund", () => {
     const holdId = await heldHoldId(rootId, "digest-fail");
     await executeHold(db, holdId, "order_fail_1");
 
-    const result = await voidHold(db, { holdId, eventId: "evt_fail_1", eventType: "payment.failed", entityId: "pay_fail_1" });
+    const result = await voidHold(db, {
+      holdId,
+      eventId: "evt_fail_1",
+      eventType: "payment.failed",
+      entityId: "pay_fail_1",
+    });
     expect(result.outcome).toBe("voided");
     expect(await spent(rootId)).toBe(0);
 
-    const release = await db.select().from(schema.journal).where(sql`kind = 'release'`).all();
+    const release = await db
+      .select()
+      .from(schema.journal)
+      .where(sql`kind = 'release'`)
+      .all();
     expect(release).toHaveLength(2);
   });
 
@@ -246,11 +291,20 @@ describe("the lifecycle: execute -> capture -> void/refund", () => {
       entityId: "pay_refund_1",
     });
 
-    const result = await refund(db, { holdId, eventId: "evt_refund_1", eventType: "refund.processed", entityId: "rfd_refund_1" });
+    const result = await refund(db, {
+      holdId,
+      eventId: "evt_refund_1",
+      eventType: "refund.processed",
+      entityId: "rfd_refund_1",
+    });
     expect(result.outcome).toBe("voided");
     expect(await spent(rootId)).toBe(0);
 
-    const entries = await db.select().from(schema.journal).where(sql`kind = 'refund'`).all();
+    const entries = await db
+      .select()
+      .from(schema.journal)
+      .where(sql`kind = 'refund'`)
+      .all();
     expect(entries).toHaveLength(2);
   });
 
@@ -266,7 +320,12 @@ describe("the lifecycle: execute -> capture -> void/refund", () => {
       entityId: "pay_term_1",
     });
 
-    const lateVoid = await voidHold(db, { holdId, eventId: "evt_term_late", eventType: "payment.failed", entityId: "pay_term_late" });
+    const lateVoid = await voidHold(db, {
+      holdId,
+      eventId: "evt_term_late",
+      eventType: "payment.failed",
+      entityId: "pay_term_late",
+    });
     expect(lateVoid.outcome).toBe("terminal");
 
     const lateCapture = await capture(db, {
@@ -310,7 +369,8 @@ describe("rejection receipts (issue #5): the audit trail's deny side", () => {
     const rootId = await seedEnvelope();
     const receipt: RejectionReceipt = {
       code: "IntentMismatch",
-      message: "Intent Hash Mismatch. Expected: a8e575eab2a7… (the committed spend), Got: 9f8e7d6c5b4a… (this request)",
+      message:
+        "Intent Hash Mismatch. Expected: a8e575eab2a7… (the committed spend), Got: 9f8e7d6c5b4a… (this request)",
       clause: "check if intent($i), request_digest($d), $d == $i",
       expected: "a8e575eab2a716e682f2e18693f9c901dcec4ea40feb50f5ff584627c2eb9523",
       got: "9f8e7d6c5b4a38271605f4e3d2c1b0a9988776655443322110ffeeddccbbaa99",
@@ -324,7 +384,11 @@ describe("rejection receipts (issue #5): the audit trail's deny side", () => {
       requestDigest: receipt.got,
     });
     await recordRejection(db, {
-      receipt: { ...receipt, code: "AmountCapExceeded", message: "Per-Transaction Cap Exceeded. …" },
+      receipt: {
+        ...receipt,
+        code: "AmountCapExceeded",
+        message: "Per-Transaction Cap Exceeded. …",
+      },
       merchantId: MERCHANT,
       spotPaise: 51_000,
       execPaise: 51_000,

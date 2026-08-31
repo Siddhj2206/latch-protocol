@@ -39,7 +39,10 @@ export function parseRazorpayEvent(body: unknown): ParsedRazorpayEvent | null {
   const b = body as {
     event?: unknown;
     id?: unknown;
-    payload?: { payment?: { entity?: unknown; id?: unknown; order_id?: unknown }; refund?: { entity?: unknown; payment_id?: unknown } };
+    payload?: {
+      payment?: { entity?: unknown; id?: unknown; order_id?: unknown };
+      refund?: { entity?: unknown; payment_id?: unknown };
+    };
   };
   const type = b.event;
   if (type !== "payment.captured" && type !== "payment.failed" && type !== "refund.processed") {
@@ -51,49 +54,60 @@ export function parseRazorpayEvent(body: unknown): ParsedRazorpayEvent | null {
     if (!p) return {};
     const e = p.entity;
     if (e !== null && typeof e === "object") return e as Partial<{ id: string; order_id: string }>;
-    return { id: typeof p.id === "string" ? p.id : undefined, order_id: typeof p.order_id === "string" ? p.order_id : undefined };
+    return {
+      id: typeof p.id === "string" ? p.id : undefined,
+      order_id: typeof p.order_id === "string" ? p.order_id : undefined,
+    };
   };
   const refundEntity = (): Partial<{ id: string; payment_id: string }> => {
     const r = b.payload?.refund;
     if (!r) return {};
     const e = r.entity;
-    if (e !== null && typeof e === "object") return e as Partial<{ id: string; payment_id: string }>;
+    if (e !== null && typeof e === "object")
+      return e as Partial<{ id: string; payment_id: string }>;
     return { payment_id: typeof r.payment_id === "string" ? r.payment_id : undefined };
   };
 
   const payment = paymentEntity();
-  const refund = refundEntity();
+  const refundData = refundEntity();
   return {
     eventId: typeof b.id === "string" ? b.id : "",
     type,
     orderId: payment.order_id,
     paymentId: payment.id,
-    refundPaymentId: refund.payment_id,
+    refundPaymentId: refundData.payment_id,
   };
 }
 
-async function resolveHold(
-  db: LedgerDB,
-  evt: ParsedRazorpayEvent,
-): Promise<HoldRow | null> {
+async function resolveHold(db: LedgerDB, evt: ParsedRazorpayEvent): Promise<HoldRow | null> {
   const clauses = [];
   if (evt.orderId) clauses.push(eq(holds.orderId, evt.orderId));
   if (evt.paymentId) clauses.push(eq(holds.paymentId, evt.paymentId));
   if (evt.refundPaymentId) clauses.push(eq(holds.paymentId, evt.refundPaymentId));
   if (clauses.length === 0) return null;
 
-  const row = await db.select().from(holds).where(or(...clauses)).get();
+  const row = await db
+    .select()
+    .from(holds)
+    .where(or(...clauses))
+    .get();
   return row ?? null;
 }
 
-export type WebhookApplyOutcome = TransitionOutcome | { outcome: "ignored" } | { outcome: "not-found" };
+export type WebhookApplyOutcome =
+  | TransitionOutcome
+  | { outcome: "ignored" }
+  | { outcome: "not-found" };
 
 /**
  * The shared webhook application path — the REAL route runs it after HMAC
  * verification; the simulate valve runs it with a fabricated event. The ledger
  * transitions are byte-for-byte the same either way.
  */
-export async function applyRazorpayEvent(db: LedgerDB, evt: ParsedRazorpayEvent): Promise<WebhookApplyOutcome> {
+export async function applyRazorpayEvent(
+  db: LedgerDB,
+  evt: ParsedRazorpayEvent,
+): Promise<WebhookApplyOutcome> {
   switch (evt.type) {
     case "payment.captured": {
       const hold = await resolveHold(db, evt);
@@ -154,7 +168,10 @@ export function signaturesEqual(received: string, expected: string): boolean {
 }
 
 /** Deterministic synthetic event for the simulate valve — repeats are duplicates. */
-export function valveEvent(hold: HoldRow, kind: "captured" | "failed" | "refunded"): ParsedRazorpayEvent {
+export function valveEvent(
+  hold: HoldRow,
+  kind: "captured" | "failed" | "refunded",
+): ParsedRazorpayEvent {
   const paymentId = `pay_valve_${hold.id}`;
   switch (kind) {
     case "captured":

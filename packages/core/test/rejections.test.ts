@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { attenuate, generateKeyPair, mintRoot, verifySpend } from "../src/index";
 
-const CAPS = { perTxCap: 50_000, merchantId: "mer_sneakerhead", maxHops: 2, maxDeltaPct: 5 } as const;
+const CAPS = {
+  perTxCap: 50_000,
+  merchantId: "mer_sneakerhead",
+  maxHops: 2,
+  maxDeltaPct: 5,
+} as const;
 const GOOD = { merchantId: "mer_sneakerhead", spot: 49_000, exec: 49_000 } as const;
 
 describe("tamper-fail suite: the crypto layer rejects by construction", () => {
@@ -61,7 +66,11 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
     const { privateKey, publicKey } = generateKeyPair();
     let token = mintRoot(CAPS, privateKey);
     for (let i = 0; i < 3; i++) {
-      token = await attenuate(token, { merchantId: GOOD.merchantId, execAmount: 49_000 }, publicKey);
+      token = await attenuate(
+        token,
+        { merchantId: GOOD.merchantId, execAmount: 49_000 },
+        publicKey,
+      );
     }
 
     const result = await verifySpend(token, GOOD, publicKey); // 4 blocks -> hops 3 > max 2
@@ -92,8 +101,7 @@ describe("tamper-fail suite: the crypto layer rejects by construction", () => {
   test("a bit-flipped token is rejected with SignatureInvalid", async () => {
     const { privateKey, publicKey } = generateKeyPair();
     const token = mintRoot(CAPS, privateKey);
-    const flipped =
-      token.slice(0, 12) + (token[12] === "A" ? "B" : "A") + token.slice(13);
+    const flipped = token.slice(0, 12) + (token[12] === "A" ? "B" : "A") + token.slice(13);
 
     const result = await verifySpend(flipped, GOOD, publicKey);
 

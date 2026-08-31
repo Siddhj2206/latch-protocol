@@ -16,8 +16,8 @@
   same functionality as Live except real payments cannot be accepted. You must
   generate a **separate set of API keys per mode**. [HIGH]
   — https://razorpay.com/docs/payments/dashboard/test-live-modes/
-- Generate keys: Dashboard → **Account & Settings → API Keys** (under *Website and
-  app settings*) → **Generate Key**, with the mode selected first. Test keys can be
+- Generate keys: Dashboard → **Account & Settings → API Keys** (under _Website and
+  app settings_) → **Generate Key**, with the mode selected first. Test keys can be
   generated without adding a website; Live keys require a verified business website.
   The Key ID is visible on the dashboard; the Key Secret is shown once at generation.
   [HIGH] — https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/
@@ -56,11 +56,18 @@
 - Response (`201`/success body shown in docs):
   ```json
   {
-    "amount": 5000, "amount_due": 5000, "amount_paid": 0, "attempts": 0,
-    "created_at": 1756455561, "currency": "INR", "entity": "order",
+    "amount": 5000,
+    "amount_due": 5000,
+    "amount_paid": 0,
+    "attempts": 0,
+    "created_at": 1756455561,
+    "currency": "INR",
+    "entity": "order",
     "id": "order_RB58MiP5SPFYyM",
     "notes": { "key1": "value3", "key2": "value2" },
-    "offer_id": null, "receipt": "receipt#1", "status": "created"
+    "offer_id": null,
+    "receipt": "receipt#1",
+    "status": "created"
   }
   ```
 - Order states: `created` → `attempted` (first payment attempted) → `paid`
@@ -69,6 +76,7 @@
 ## 3. Creating a payment against the order (test instruments)
 
 ### 3a. Standard Checkout (the documented happy path)
+
 - Docs flow: create order on the server → pass `order_id` into Standard Checkout →
   customer pays → verify on the server. A payment **without an order_id cannot be
   captured and will be automatically refunded**. [HIGH]
@@ -76,6 +84,7 @@
   and https://razorpay.com/docs/payments/payment-gateway/s2s-integration/json/v2/build-integration/cards/
 
 ### 3b. S2S `POST /v1/payments/create/json` (server-to-server, still documented)
+
 - Current docs (S2S JSON v2, cards): after creating the order, create the payment directly:
   ```bash
   curl -X POST https://api.razorpay.com/v1/payments/create/json \
@@ -111,6 +120,7 @@
   Orders API / account settings (see §5). [HIGH — verified by absence in fetched param tables]
 
 ### 3c. Test instruments
+
 - **Test cards** (test mode only; no real money; live keys reject these with
   `card issuer is invalid` / `invalid card input`). Behaviour: use any random CVV and any
   future expiry date; on success the mock bank page asks for an OTP — **4–10 digits → success,
@@ -129,6 +139,7 @@
 ## 4. Webhooks
 
 ### 4a. Configuration
+
 - Set up per mode (separate URLs for Live vs Test) at Dashboard → **Account & Settings →
   Webhooks** → Add New Webhook. Enter URL + optional **Secret** + select Active Events.
   Up to **30 URLs**; URLs **must use port 80 or 443** and be **public**; a URL containing
@@ -146,6 +157,7 @@
   https://razorpay.com/docs/webhooks/validate-test/
 
 ### 4b. Relevant events (names as documented)
+
 - **Payments**: `payment.authorized`, `payment.captured`, `payment.failed`, plus
   `payment.downtime.started` / `payment.downtime.resolved` / `payment.downtime.updated`.
   [HIGH — event names & payloads on the page]
@@ -164,6 +176,7 @@
   — full list index: https://razorpay.com/docs/webhooks/all/
 
 ### 4c. Signature verification
+
 - When a webhook **secret** is set, Razorpay includes the payload hash in the
   **`X-Razorpay-Signature`** header. (Note: the header is `X-Razorpay-Signature`, not
   "Razorpay-X-Signature".) [HIGH]
@@ -179,6 +192,7 @@
   — https://razorpay.com/docs/payments/payment-gateway/s2s-integration/json/v2/build-integration/cards/
 
 ### 4d. Local dev / reaching a locally-running app
+
 - **localhost cannot be used directly** — webhook delivery requires a public URL, and saving
   a localhost endpoint errors out. [HIGH]
 - **Many common tunnels are blacklisted** and rejected as webhook URLs: `burpcollaborator.net`,
@@ -198,10 +212,19 @@
      (`automatic_expiry_period` mins, `manual_expiry_period` mins, `refund_speed`);
      these take precedence over the account-level setting. Example body:
      ```json
-     { "amount": 50000, "currency": "INR", "receipt": "rcptid_11",
-       "payment": { "capture": "automatic",
-         "capture_options": { "automatic_expiry_period": 12,
-                              "manual_expiry_period": 7200, "refund_speed": "optimum" } } }
+     {
+       "amount": 50000,
+       "currency": "INR",
+       "receipt": "rcptid_11",
+       "payment": {
+         "capture": "automatic",
+         "capture_options": {
+           "automatic_expiry_period": 12,
+           "manual_expiry_period": 7200,
+           "refund_speed": "optimum"
+         }
+       }
+     }
      ```
      [HIGH] — https://razorpay.com/docs/payments/payments/capture-settings/api/
   2. **Legacy boolean** `payment_capture: true|false` on order creation — still documented
@@ -242,15 +265,15 @@
   — https://github.com/razorpay/razorpay-mcp-server (README.md)
 - The tool catalogue (README, package `razorpay-*`) and the **Remote Server Support** column
   for the tools relevant to this use case: [HIGH — README table + source `pkg/razorpay/tools.go`]
-  | Tool | Endpoint it wraps | Remote mode? |
-  |---|---|---|
-  | `create_order` | `POST /v1/orders` | ✅ yes |
-  | `capture_payment` | `POST /v1/payments/:id/capture` | ✅ yes |
-  | `create_refund` | `POST /v1/payments/:id/refund` | ❌ **no (local only)** |
-  | `fetch_order` | `GET /v1/orders/:id` | ✅ yes |
-  | `fetch_payment` | `GET /v1/payments/:id` | ✅ yes |
-  | `initiate_payment` | `POST /v1/payments/create/json` (saved method + order) | ✅ yes |
-  | `submit_otp`, `resend_otp` | otp submit/resend | ✅ yes |
+  | Tool                       | Endpoint it wraps                                      | Remote mode?           |
+  | -------------------------- | ------------------------------------------------------ | ---------------------- |
+  | `create_order`             | `POST /v1/orders`                                      | ✅ yes                 |
+  | `capture_payment`          | `POST /v1/payments/:id/capture`                        | ✅ yes                 |
+  | `create_refund`            | `POST /v1/payments/:id/refund`                         | ❌ **no (local only)** |
+  | `fetch_order`              | `GET /v1/orders/:id`                                   | ✅ yes                 |
+  | `fetch_payment`            | `GET /v1/payments/:id`                                 | ✅ yes                 |
+  | `initiate_payment`         | `POST /v1/payments/create/json` (saved method + order) | ✅ yes                 |
+  | `submit_otp`, `resend_otp` | otp submit/resend                                      | ✅ yes                 |
 - **This is the key MCP fact for the demo:** `create_refund` is listed with **no remote
   support** — refund creation requires the **local** (Docker/source) server. All the other
   write tools needed (`create_order`, `capture_payment`) and the reads (`fetch_order`,

@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { Biscuit, block } from "@smithery/biscuit";
 import { attenuate, generateKeyPair, mintRoot, mintStepUp, verifySpend } from "../src/index";
 
-const CAPS = { perTxCap: 50_000, merchantId: "mer_sneakerhead", maxHops: 2, maxDeltaPct: 5 } as const;
+const CAPS = {
+  perTxCap: 50_000,
+  merchantId: "mer_sneakerhead",
+  maxHops: 2,
+  maxDeltaPct: 5,
+} as const;
 const GOOD = { merchantId: "mer_sneakerhead", spot: 49_000, exec: 49_000 } as const;
 
 /**
@@ -25,7 +30,8 @@ describe("rejection receipts: every denial carries the clause that failed", () =
     if (result.authorized) return;
     expect(result.receipt).toEqual({
       code: "AmountCapExceeded",
-      message: "Per-Transaction Cap Exceeded. Expected: at most ₹500.00, Got: ₹510.00 (committed spot)",
+      message:
+        "Per-Transaction Cap Exceeded. Expected: at most ₹500.00, Got: ₹510.00 (committed spot)",
       clause: "check if amount_cap($c), spot($s), $s <= $c",
       expected: "at most ₹500.00",
       got: "₹510.00 (committed spot)",
@@ -90,7 +96,9 @@ describe("rejection receipts: every denial carries the clause that failed", () =
     if (result.authorized) return;
     expect(result.receipt.code).toBe("AudienceMismatch");
     expect(result.receipt.clause).toBe("check if merchant($m), request_merchant($r), $r == $m");
-    expect(result.receipt.message).toBe("Merchant Mismatch. Expected: mer_sneakerhead, Got: mer_evil");
+    expect(result.receipt.message).toBe(
+      "Merchant Mismatch. Expected: mer_sneakerhead, Got: mer_evil",
+    );
   });
 
   test("a category-bound token presented without any category receipts the missing side", async () => {
@@ -125,7 +133,8 @@ describe("rejection receipts: every denial carries the clause that failed", () =
     if (result.authorized) return;
     expect(result.receipt).toEqual({
       code: "SlippageExceeded",
-      message: "Slippage Exceeded. Expected: at most ₹514.50 (₹490.00 spot + 5% allowance), Got: ₹520.00",
+      message:
+        "Slippage Exceeded. Expected: at most ₹514.50 (₹490.00 spot + 5% allowance), Got: ₹520.00",
       clause: "check if max_delta($d), spot($s), exec($e), $e <= $s + ($s * $d / 100)",
       expected: "at most ₹514.50 (₹490.00 spot + 5% allowance)",
       got: "₹520.00",
@@ -136,7 +145,11 @@ describe("rejection receipts: every denial carries the clause that failed", () =
     const { privateKey, publicKey } = generateKeyPair();
     let token = mintRoot(CAPS, privateKey);
     for (let i = 0; i < 3; i++) {
-      token = await attenuate(token, { merchantId: GOOD.merchantId, execAmount: 49_000 }, publicKey);
+      token = await attenuate(
+        token,
+        { merchantId: GOOD.merchantId, execAmount: 49_000 },
+        publicKey,
+      );
     }
 
     const result = await verifySpend(token, GOOD, publicKey);
@@ -182,7 +195,10 @@ describe("rejection receipts: every denial carries the clause that failed", () =
 
   test("a zero-tolerance step-up over-charged by the merchant receipts IntentMismatch (Act 3)", async () => {
     const { privateKey, publicKey } = generateKeyPair();
-    const token = await mintStepUp({ merchantId: "mer_sneakerhead", execAmount: 600_000 }, privateKey);
+    const token = await mintStepUp(
+      { merchantId: "mer_sneakerhead", execAmount: 600_000 },
+      privateKey,
+    );
 
     const result = await verifySpend(
       token,

@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { attenuate, generateKeyPair, mintRoot, verifySpend } from "../src/index";
 
-const CAPS = { perTxCap: 50_000, merchantId: "mer_sneakerhead", maxHops: 2, maxDeltaPct: 5 } as const;
+const CAPS = {
+  perTxCap: 50_000,
+  merchantId: "mer_sneakerhead",
+  maxHops: 2,
+  maxDeltaPct: 5,
+} as const;
 const GOOD = { merchantId: "mer_sneakerhead", spot: 49_000, exec: 49_000 } as const;
 
 describe("pre-minted UPI Lite: one capability, repeated autonomous spends", () => {
@@ -21,8 +26,16 @@ describe("pre-minted UPI Lite: one capability, repeated autonomous spends", () =
     const spends = [47_000, 48_500, 49_250, 48_800];
 
     for (const amount of spends) {
-      const delegated = await attenuate(root, { merchantId: GOOD.merchantId, execAmount: amount }, publicKey);
-      const result = await verifySpend(delegated, { merchantId: GOOD.merchantId, spot: amount, exec: amount }, publicKey);
+      const delegated = await attenuate(
+        root,
+        { merchantId: GOOD.merchantId, execAmount: amount },
+        publicKey,
+      );
+      const result = await verifySpend(
+        delegated,
+        { merchantId: GOOD.merchantId, spot: amount, exec: amount },
+        publicKey,
+      );
       expect(result).toEqual({ authorized: true });
     }
   });

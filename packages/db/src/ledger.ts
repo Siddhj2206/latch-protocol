@@ -69,7 +69,9 @@ function raw(db: LedgerDB): D1Database {
 }
 
 function stmt(db: LedgerDB, sql: string, ...params: Param[]) {
-  return raw(db).prepare(sql).bind(...params);
+  return raw(db)
+    .prepare(sql)
+    .bind(...params);
 }
 
 /** Every gated write shares this predicate: the intent key already on file? */
@@ -142,7 +144,9 @@ export async function hold(db: LedgerDB, input: HoldInput): Promise<HoldOutcome>
   const envelopeGate = input.stepUp
     ? "NOT EXISTS (SELECT 1 FROM single_use_claims c WHERE c.capability_chain_id = ?)"
     : "EXISTS (SELECT 1 FROM envelopes e WHERE e.root_id = ? AND e.spent_paise + ? <= e.budget_paise)";
-  const envelopeArgs: Param[] = input.stepUp ? [input.stepUpChainId ?? ""] : [input.rootId, input.execPaise];
+  const envelopeArgs: Param[] = input.stepUp
+    ? [input.stepUpChainId ?? ""]
+    : [input.rootId, input.execPaise];
 
   const results = await raw(db).batch([
     // 1. Reserve budget (skipped for step-up: its bound is the single-use claim).
@@ -229,9 +233,16 @@ export async function hold(db: LedgerDB, input: HoldInput): Promise<HoldOutcome>
   const replayed = await claimedStepUpReplay(db, input);
   if (replayed) return replayed;
 
-  const envelope = await db.select().from(envelopes).where(eq(envelopes.rootId, input.rootId)).get();
+  const envelope = await db
+    .select()
+    .from(envelopes)
+    .where(eq(envelopes.rootId, input.rootId))
+    .get();
   if (!envelope) return { outcome: "unknown-envelope" };
-  return { outcome: "budget-exhausted", remainingPaise: envelope.budgetPaise - envelope.spentPaise };
+  return {
+    outcome: "budget-exhausted",
+    remainingPaise: envelope.budgetPaise - envelope.spentPaise,
+  };
 }
 
 async function claimRow(db: LedgerDB, capabilityChainId: string) {
@@ -261,7 +272,11 @@ async function claimedStepUpReplay(
  * Money has not moved; the ledger just learns the order id (receipt = hold id,
  * Razorpay's own idempotency key).
  */
-export async function executeHold(db: LedgerDB, holdId: string, orderId: string): Promise<TransitionOutcome> {
+export async function executeHold(
+  db: LedgerDB,
+  holdId: string,
+  orderId: string,
+): Promise<TransitionOutcome> {
   const result = await db
     .update(holds)
     .set({ status: "executed", orderId, updatedAt: now() })
@@ -402,10 +417,7 @@ export async function voidHold(db: LedgerDB, input: TransitionInput): Promise<Tr
     input,
     "voided",
     () => [statusGuard("'held', 'executed'"), RESTORE],
-    (t) => [
-      [t, input.holdId],
-      [input.holdId],
-    ],
+    (t) => [[t, input.holdId], [input.holdId]],
     { kind: "release", debit: "escrow", credit: "envelope" },
   );
 }
@@ -420,10 +432,7 @@ export async function refund(db: LedgerDB, input: TransitionInput): Promise<Tran
     input,
     "voided",
     () => [statusGuard("'captured'"), RESTORE],
-    (t) => [
-      [t, input.holdId],
-      [input.holdId],
-    ],
+    (t) => [[t, input.holdId], [input.holdId]],
     { kind: "refund", debit: "merchant", credit: "envelope" },
   );
 }
@@ -435,7 +444,10 @@ export async function getHold(db: LedgerDB, holdId: string): Promise<HoldRow | n
 }
 
 /** The envelope read any root-derived capability may perform: remaining budget. */
-export async function readEnvelope(db: LedgerDB, rootId: string): Promise<(EnvelopeRow & { remainingPaise: number }) | null> {
+export async function readEnvelope(
+  db: LedgerDB,
+  rootId: string,
+): Promise<(EnvelopeRow & { remainingPaise: number }) | null> {
   const row = await db.select().from(envelopes).where(eq(envelopes.rootId, rootId)).get();
   if (!row) return null;
   return { ...row, remainingPaise: row.budgetPaise - row.spentPaise };
@@ -452,7 +464,11 @@ export async function registerEnvelope(
     budgetPaise: number;
   },
 ): Promise<"registered" | "exists"> {
-  const existing = await db.select().from(envelopes).where(eq(envelopes.rootId, input.rootId)).get();
+  const existing = await db
+    .select()
+    .from(envelopes)
+    .where(eq(envelopes.rootId, input.rootId))
+    .get();
   if (existing) return "exists";
   await db.insert(envelopes).values({ ...input, spentPaise: 0, createdAt: now() });
   return "registered";

@@ -4,12 +4,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { migrate } from "drizzle-orm/d1/migrator";
 import { eq } from "drizzle-orm";
 
-import {
-  generateKeyPair,
-  mintRoot,
-  mintStepUp,
-  attenuate,
-} from "@latch-protocol/core";
+import { generateKeyPair, mintRoot, mintStepUp, attenuate } from "@latch-protocol/core";
 import * as schema from "@latch-protocol/db/schema";
 import { envelopes } from "@latch-protocol/db/schema";
 import type { LedgerDB } from "@latch-protocol/db/ledger";
@@ -20,7 +15,12 @@ import path from "node:path";
 
 const SECRET = "test-webhook-secret";
 const CORS = "http://localhost:3001";
-const CAPS = { perTxCap: 50_000, merchantId: "mer_sneakerhead", maxHops: 2, maxDeltaPct: 5 } as const;
+const CAPS = {
+  perTxCap: 50_000,
+  merchantId: "mer_sneakerhead",
+  maxHops: 2,
+  maxDeltaPct: 5,
+} as const;
 
 let d1Client: D1Database;
 let db: LedgerDB;
@@ -57,11 +57,21 @@ async function register(sw: ReturnType<typeof swarm>): Promise<string> {
   return (await readJson<{ rootId: string }>(res)).rootId;
 }
 
-async function hold(sw: ReturnType<typeof swarm>, exec = 30_000, over: Record<string, unknown> = {}) {
+async function hold(
+  sw: ReturnType<typeof swarm>,
+  exec = 30_000,
+  over: Record<string, unknown> = {},
+) {
   return sw.app().request("/v1/holds", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token: sw.rootToken, merchantId: "mer_sneakerhead", spot: exec, exec, ...over }),
+    body: JSON.stringify({
+      token: sw.rootToken,
+      merchantId: "mer_sneakerhead",
+      spot: exec,
+      exec,
+      ...over,
+    }),
   });
 }
 
@@ -76,7 +86,11 @@ async function execute(sw: ReturnType<typeof swarm>, id: string) {
   return { status: res.status, body: await readJson<{ orderId?: string }>(res) };
 }
 
-async function valve(sw: ReturnType<typeof swarm>, id: string, event: "captured" | "failed" | "refunded") {
+async function valve(
+  sw: ReturnType<typeof swarm>,
+  id: string,
+  event: "captured" | "failed" | "refunded",
+) {
   const res = await sw.app().request("/v1/simulate/webhook", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -106,7 +120,9 @@ beforeAll(async () => {
   );
   d1Client = await mf.getD1Database("LEDGER_HTTP_TEST");
   db = drizzle(d1Client, { schema }) as LedgerDB;
-  await migrate(db, { migrationsFolder: path.join(import.meta.dir, "../../../packages/db/src/migrations") });
+  await migrate(db, {
+    migrationsFolder: path.join(import.meta.dir, "../../../packages/db/src/migrations"),
+  });
 });
 
 describe("envelope registration (mint + register, root custody)", () => {
@@ -124,7 +140,11 @@ describe("envelope registration (mint + register, root custody)", () => {
 
   test("an attenuated capability cannot mint an envelope", async () => {
     const sw = swarm();
-    const sub = await attenuate(sw.rootToken, { merchantId: "mer_sneakerhead", execAmount: 10_000 }, sw.keys.publicKey);
+    const sub = await attenuate(
+      sw.rootToken,
+      { merchantId: "mer_sneakerhead", execAmount: 10_000 },
+      sw.keys.publicKey,
+    );
     const res = await sw.app().request("/v1/envelopes", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -151,7 +171,9 @@ describe("the two-phase flow over HTTP (Act 2)", () => {
 
     const held = await hold(sw);
     expect(held.status).toBe(201);
-    const heldBody = await readJson<{ holdId: string; status: string; remainingPaise: number }>(held);
+    const heldBody = await readJson<{ holdId: string; status: string; remainingPaise: number }>(
+      held,
+    );
     expect(heldBody.status).toBe("held");
     expect(heldBody.remainingPaise).toBe(70_000);
 
@@ -164,7 +186,9 @@ describe("the two-phase flow over HTTP (Act 2)", () => {
     expect(await spent(rootId)).toBe(30_000);
 
     const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
-    const ledgerBody = await readJson<{ holds: { id: string; status: string; orderId: string | null; paymentId: string | null }[] }>(ledger);
+    const ledgerBody = await readJson<{
+      holds: { id: string; status: string; orderId: string | null; paymentId: string | null }[];
+    }>(ledger);
     const row = ledgerBody.holds[0]!;
     expect(row.status).toBe("captured");
     expect(row.orderId).toBe(`order_fake_${heldBody.holdId}`);
@@ -218,17 +242,33 @@ describe("hold-write semantics at the edge", () => {
     const rootId = await register(sw);
     const res = await hold(sw, 30_000);
     expect(res.status).toBe(402);
-    const body = await readJson<{ error: string; remainingPaise: number; receipt: { code: string; message: string; clause: string } }>(res);
+    const body = await readJson<{
+      error: string;
+      remainingPaise: number;
+      receipt: { code: string; message: string; clause: string };
+    }>(res);
     expect(body.error).toBe("budget-exhausted");
     expect(body.remainingPaise).toBe(20_000);
     expect(body.receipt.code).toBe("BudgetExhausted");
     // The gate clause is the REAL predicate, not invented pseudo-Datalog.
-    expect(body.receipt.clause).toBe("envelopes budget gate (D1 SQL): spent_paise + ? <= budget_paise AND root_id = ?");
-    expect(body.receipt.message).toBe("Envelope Budget Exhausted. Expected: a spend within the ₹200.00 remaining, Got: a ₹300.00 hold");
+    expect(body.receipt.clause).toBe(
+      "envelopes budget gate (D1 SQL): spent_paise + ? <= budget_paise AND root_id = ?",
+    );
+    expect(body.receipt.message).toBe(
+      "Envelope Budget Exhausted. Expected: a spend within the ₹200.00 remaining, Got: a ₹300.00 hold",
+    );
 
     // A gate denial lands on the ledger's deny side too (issue #5).
     const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
-    const ledgerBody = await readJson<{ rejections: { code: string; clause: string; rootId: string | null; expected: string; got: string }[] }>(ledger);
+    const ledgerBody = await readJson<{
+      rejections: {
+        code: string;
+        clause: string;
+        rootId: string | null;
+        expected: string;
+        got: string;
+      }[];
+    }>(ledger);
     expect(ledgerBody.rejections).toHaveLength(1);
     expect(ledgerBody.rejections[0]!.code).toBe("BudgetExhausted");
     expect(ledgerBody.rejections[0]!.clause).toBe(body.receipt.clause);
@@ -263,12 +303,20 @@ describe("hold-write semantics at the edge", () => {
   test("a step-up spend is single-use: its own bounded envelope, claimable once", async () => {
     const sw = swarm(20_000); // envelope far too small — step-up ignores it
     const rootId = await register(sw);
-    const stepUpToken = await mintStepUp({ merchantId: "mer_sneakerhead", execAmount: 600_000 }, sw.keys.privateKey);
+    const stepUpToken = await mintStepUp(
+      { merchantId: "mer_sneakerhead", execAmount: 600_000 },
+      sw.keys.privateKey,
+    );
 
     const first = await sw.app().request("/v1/holds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token: stepUpToken, merchantId: "mer_sneakerhead", spot: 600_000, exec: 600_000 }),
+      body: JSON.stringify({
+        token: stepUpToken,
+        merchantId: "mer_sneakerhead",
+        spot: 600_000,
+        exec: 600_000,
+      }),
     });
     expect(first.status).toBe(201);
     const firstBody = await readJson<{ holdId: string; stepUp: boolean }>(first);
@@ -277,10 +325,18 @@ describe("hold-write semantics at the edge", () => {
     const replay = await sw.app().request("/v1/holds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token: stepUpToken, merchantId: "mer_sneakerhead", spot: 600_000, exec: 600_000 }),
+      body: JSON.stringify({
+        token: stepUpToken,
+        merchantId: "mer_sneakerhead",
+        spot: 600_000,
+        exec: 600_000,
+      }),
     });
     expect(replay.status).toBe(409);
-    const replayBody = await readJson<{ error: string; receipt: { code: string; message: string } }>(replay);
+    const replayBody = await readJson<{
+      error: string;
+      receipt: { code: string; message: string };
+    }>(replay);
     expect(replayBody.error).toBe("step-up-replayed");
     // The precise story: the receipt names the hold that claimed the chain.
     expect(replayBody.receipt.message).toContain(`already claimed by ${firstBody.holdId}`);
@@ -288,7 +344,9 @@ describe("hold-write semantics at the edge", () => {
     // The gate denial is recorded on the deny side — under the step-up's OWN
     // root (a step-up is a fresh envelope root, not the swarm's).
     const ledger = await sw.app().request("/v1/ledger");
-    const ledgerBody = await readJson<{ rejections: { code: string; message: string; rootId: string | null }[] }>(ledger);
+    const ledgerBody = await readJson<{
+      rejections: { code: string; message: string; rootId: string | null }[];
+    }>(ledger);
     const stepUpDenial = ledgerBody.rejections.find((r) => r.code === "StepUpReplayed");
     expect(stepUpDenial?.message).toContain(`already claimed by ${firstBody.holdId}`);
     expect(stepUpDenial?.rootId).not.toBe(rootId);
@@ -308,22 +366,37 @@ describe("hold-write semantics at the edge", () => {
     const res = await sw.app().request("/v1/holds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token: catToken, merchantId: "mer_evil", merchantCategory: "food", spot: 30_000, exec: 30_000 }),
+      body: JSON.stringify({
+        token: catToken,
+        merchantId: "mer_evil",
+        merchantCategory: "food",
+        spot: 30_000,
+        exec: 30_000,
+      }),
     });
     expect(res.status).toBe(403);
-    const body = await readJson<{ reason: string; receipt: { code: string; message: string; clause: string; expected: string; got: string } }>(res);
+    const body = await readJson<{
+      reason: string;
+      receipt: { code: string; message: string; clause: string; expected: string; got: string };
+    }>(res);
     expect(body.reason).toBe("AudienceMismatch");
     // THE canonical line from CONTEXT.md / IDEA.md:
     expect(body.receipt.message).toBe("Merchant Category Mismatch. Expected: travel, Got: food");
-    expect(body.receipt.clause).toBe("check if merchant_category($c), request_category($r), $r == $c");
+    expect(body.receipt.clause).toBe(
+      "check if merchant_category($c), request_category($r), $r == $c",
+    );
     expect(body.receipt.expected).toBe("travel");
     expect(body.receipt.got).toBe("food");
 
     // Recorded on the deny side, attributed to the category-bound root.
     const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
-    const ledgerBody = await readJson<{ rejections: { code: string; message: string; rootId: string | null }[] }>(ledger);
+    const ledgerBody = await readJson<{
+      rejections: { code: string; message: string; rootId: string | null }[];
+    }>(ledger);
     expect(ledgerBody.rejections).toHaveLength(1);
-    expect(ledgerBody.rejections[0]!.message).toBe("Merchant Category Mismatch. Expected: travel, Got: food");
+    expect(ledgerBody.rejections[0]!.message).toBe(
+      "Merchant Category Mismatch. Expected: travel, Got: food",
+    );
     expect(ledgerBody.rejections[0]!.rootId).toBe(rootId);
   });
 
@@ -333,10 +406,19 @@ describe("hold-write semantics at the edge", () => {
     const res = await sw.app().request("/v1/holds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token: sw.rootToken, merchantId: "mer_evil", spot: 30_000, exec: 30_000 }),
+      body: JSON.stringify({
+        token: sw.rootToken,
+        merchantId: "mer_evil",
+        spot: 30_000,
+        exec: 30_000,
+      }),
     });
     expect(res.status).toBe(403);
-    const body = await readJson<{ authorized: boolean; reason: string; receipt: { code: string; clause: string; expected: string; got: string } }>(res);
+    const body = await readJson<{
+      authorized: boolean;
+      reason: string;
+      receipt: { code: string; clause: string; expected: string; got: string };
+    }>(res);
     expect(body.authorized).toBe(false);
     expect(body.reason).toBe("AudienceMismatch");
     expect(body.receipt.clause).toBe("check if merchant($m), request_merchant($r), $r == $m");
@@ -346,7 +428,9 @@ describe("hold-write semantics at the edge", () => {
 
     // The rejection is on the ledger's deny side, not just the 403 (issue #5).
     const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
-    const ledgerBody = await readJson<{ rejections: { code: string; message: string; rootId: string | null }[] }>(ledger);
+    const ledgerBody = await readJson<{
+      rejections: { code: string; message: string; rootId: string | null }[];
+    }>(ledger);
     expect(ledgerBody.rejections).toHaveLength(1);
     expect(ledgerBody.rejections[0]!.code).toBe("AudienceMismatch");
     expect(ledgerBody.rejections[0]!.rootId).toBe(rootId);
@@ -355,11 +439,17 @@ describe("hold-write semantics at the edge", () => {
   test("a signature-invalid token is rejected AND recorded with no root id", async () => {
     const sw = swarm();
     const rootId = await register(sw);
-    const flipped = sw.rootToken.slice(0, 12) + (sw.rootToken[12] === "A" ? "B" : "A") + sw.rootToken.slice(13);
+    const flipped =
+      sw.rootToken.slice(0, 12) + (sw.rootToken[12] === "A" ? "B" : "A") + sw.rootToken.slice(13);
     const res = await sw.app().request("/v1/holds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token: flipped, merchantId: "mer_sneakerhead", spot: 30_000, exec: 30_000 }),
+      body: JSON.stringify({
+        token: flipped,
+        merchantId: "mer_sneakerhead",
+        spot: 30_000,
+        exec: 30_000,
+      }),
     });
     expect(res.status).toBe(403);
     const body = await readJson<{ reason: string; receipt: { code: string; clause: string } }>(res);
@@ -367,12 +457,16 @@ describe("hold-write semantics at the edge", () => {
     expect(body.receipt.clause).toContain("ed25519");
 
     const ledger = await sw.app().request(`/v1/ledger?rootId=${rootId}`);
-    const ledgerBody = await readJson<{ rejections: { code: string; rootId: string | null }[] }>(ledger);
+    const ledgerBody = await readJson<{ rejections: { code: string; rootId: string | null }[] }>(
+      ledger,
+    );
     // unattributable to any root: recorded with a null root id, off the root feed
     expect(ledgerBody.rejections).toHaveLength(0);
     const all = await sw.app().request("/v1/ledger");
     const allBody = await readJson<{ rejections: { code: string; rootId: string | null }[] }>(all);
-    expect(allBody.rejections.some((r) => r.code === "SignatureInvalid" && r.rootId === null)).toBe(true);
+    expect(allBody.rejections.some((r) => r.code === "SignatureInvalid" && r.rootId === null)).toBe(
+      true,
+    );
   });
 
   test("a hold on an unregistered root is a 404 with an explainable nudge", async () => {
@@ -402,18 +496,30 @@ describe("the real webhook listener (HMAC, shapes, exactly-once)", () => {
     );
     const res = await sw.app().request("/v1/webhooks/razorpay", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-razorpay-signature": signature, "x-razorpay-event-id": eventId },
+      headers: {
+        "content-type": "application/json",
+        "x-razorpay-signature": signature,
+        "x-razorpay-event-id": eventId,
+      },
       body,
     });
     expect(res.status).toBe(200);
     expect((await readJson<{ outcome: string }>(res)).outcome).toBe("captured");
 
-    const event = await db.select().from(schema.webhookEvents).where(eq(schema.webhookEvents.eventId, eventId)).get();
+    const event = await db
+      .select()
+      .from(schema.webhookEvents)
+      .where(eq(schema.webhookEvents.eventId, eventId))
+      .get();
     expect(event?.entityId).toBe("pay_real_1");
 
     const dup = await sw.app().request("/v1/webhooks/razorpay", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-razorpay-signature": signature, "x-razorpay-event-id": eventId },
+      headers: {
+        "content-type": "application/json",
+        "x-razorpay-signature": signature,
+        "x-razorpay-event-id": eventId,
+      },
       body,
     });
     expect((await readJson<{ outcome: string }>(dup)).outcome).toBe("duplicate");
@@ -431,7 +537,11 @@ describe("the real webhook listener (HMAC, shapes, exactly-once)", () => {
     });
     const res = await sw.app().request("/v1/webhooks/razorpay", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-razorpay-signature": "deadbeef", "x-razorpay-event-id": "evt_evil" },
+      headers: {
+        "content-type": "application/json",
+        "x-razorpay-signature": "deadbeef",
+        "x-razorpay-event-id": "evt_evil",
+      },
       body,
     });
     expect(res.status).toBe(401);
@@ -444,10 +554,11 @@ describe("the real webhook listener (HMAC, shapes, exactly-once)", () => {
 
   test("without a configured secret the listener fails closed (503)", async () => {
     const keys = generateKeyPair();
-    const res = await createApp({ corsOrigin: CORS, db: d1Client, rootPublicKey: keys.publicKey.toString() }).request(
-      "/v1/webhooks/razorpay",
-      { method: "POST" },
-    );
+    const res = await createApp({
+      corsOrigin: CORS,
+      db: d1Client,
+      rootPublicKey: keys.publicKey.toString(),
+    }).request("/v1/webhooks/razorpay", { method: "POST" });
     expect(res.status).toBe(503);
   });
 });

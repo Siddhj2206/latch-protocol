@@ -93,7 +93,10 @@ export interface RejectionContext {
   };
 }
 
-export function describeRejection(reason: RejectionReason, ctx: RejectionContext): RejectionReceipt {
+export function describeRejection(
+  reason: RejectionReason,
+  ctx: RejectionContext,
+): RejectionReceipt {
   switch (reason) {
     case "AmountCapExceeded": {
       const cap = ctx.bound?.perTxCap ?? 0;
