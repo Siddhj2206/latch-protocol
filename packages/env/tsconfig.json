@@ -1,3 +1,4 @@
 {
-  "extends": "@latch-protocol/config/tsconfig.base.json"
+  "extends": "@latch-protocol/config/tsconfig.base.json",
+  "include": ["src", "env.d.ts"]
 }
