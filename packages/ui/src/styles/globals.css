@@ -127,4 +127,31 @@
   html {
     @apply font-sans;
   }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 85%, transparent);
+    color: var(--primary-foreground);
+  }
+}
+
+/* Theme-aware halftone: dot color derives from --foreground via color-mix,
+// so the same class reads correctly on light + dark. Hardcoded rgba dots
+// fail one theme — never do that. */
+@utility halftone {
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--foreground) 16%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 10px 10px;
+}
+
+@utility halftone-soft {
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--foreground) 9%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 12px 12px;
+}
+
+@utility halftone-fade {
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
 }

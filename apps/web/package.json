@@ -16,7 +16,6 @@
     "@tanstack/react-start": "^1.168.32",
     "dotenv": "catalog:",
     "lucide-react": "catalog:",
-    "next-themes": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
