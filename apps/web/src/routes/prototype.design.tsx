@@ -212,7 +212,7 @@ function LedgerSection() {
         </TableHeader>
         <TableBody>
           {LEDGER_ROWS.map((row) => (
-            <TableRow key={row.id} className="h-10">
+            <TableRow key={row.id} className={cn(row.state === "hold" && "hold-tone", "h-10")}>
               <TableCell className="font-mono text-[12px]">{row.id}</TableCell>
               <TableCell>{row.what}</TableCell>
               <TableCell className="text-right font-mono text-[12px] tabular-nums">

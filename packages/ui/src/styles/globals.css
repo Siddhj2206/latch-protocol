@@ -33,6 +33,7 @@
   --accent-foreground: #1a1d21;
   --approve: #635bff;
   --approve-foreground: #ffffff;
+  --ht-ink: color-mix(in srgb, var(--foreground) 62%, transparent);
   --destructive: #d92d20;
   --border: #ebebeb;
   --input: #d9dee4;
@@ -70,6 +71,7 @@
   --accent-foreground: #ededed;
   --approve: #7a73ff;
   --approve-foreground: #0c0e12;
+  --ht-ink: color-mix(in srgb, var(--foreground) 62%, transparent);
   --destructive: #f04438;
   --border: #2a2e33;
   --input: #2a2e33;
@@ -148,5 +150,36 @@
   }
   ::selection {
     background: color-mix(in oklch, var(--approve) 22%, transparent);
+  }
+}
+
+/*
+ * Hold-state halftone. Proper halftone = tone carried by DOT SIZE on a fixed
+ * grid: a uniform dot layer is thresholded by contrast() while a mask
+ * gradient eats each dot from its soft edge inward, so dots shrink along the
+ * ramp instead of merely fading. Dots are ink, never the accent.
+ *
+ * ONE placement: ledger rows in Held state — funds encumbered but unsettled,
+ * "ink on the page, not yet printed solid". The tone occupies the row's
+ * leading two-thirds and falls to zero before the amount column, so tabular
+ * numerals always sit on clean paper. It renders behind content (negative
+ * z-index inside an isolated row) and vanishes on resolution, so tone always
+ * means pending — never wallpaper. One tone layer per surface: no moiré.
+ */
+@utility hold-tone {
+  position: relative;
+  isolation: isolate;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--background);
+    background-image: radial-gradient(circle, var(--ht-ink) 1.1px, transparent 1.5px);
+    background-size: 9px 9px;
+    mask-image: linear-gradient(90deg, #000 0%, rgb(0 0 0 / 0.6) 35%, transparent 72%);
+    filter: contrast(18);
   }
 }
