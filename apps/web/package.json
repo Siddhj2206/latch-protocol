@@ -5,6 +5,7 @@
   "scripts": {
     "build": "vite build",
     "serve": "vite preview",
+    "dev": "vite dev",
     "dev:bare": "vite dev"
   },
   "dependencies": {
