@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { MessageSquareText, ScrollText, Store, Wallet } from "lucide-react";
+import { MessageSquareText, ScrollText, Store } from "lucide-react";
 
 import { ModeToggle } from "@latch-protocol/ui/components/mode-toggle";
 import {
@@ -8,7 +8,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -28,7 +27,7 @@ const ENVELOPE = {
   root: "lch_root_7f3a",
   spent: "₹505.00",
   cap: "₹550.00",
-  scope: "footwear · mer_sneakerhead",
+  scope: "Footwear · SneakerHead India",
 };
 
 export function AppSidebar() {
@@ -37,16 +36,12 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="px-1 py-0.5">
-          <div className="text-sm font-semibold tracking-tight">LATCH</div>
-          <div className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-            {"// risk protocol"}
-          </div>
+        <div className="px-1 py-0.5 font-display text-[15px] font-semibold tracking-tight">
+          Latch
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Surfaces</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {NAV.map(({ href, label, Icon }) => (
@@ -66,39 +61,32 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        <SidebarSeparator className="mx-0" />
         <SidebarGroup>
-          <SidebarGroupLabel>Envelope</SidebarGroupLabel>
           <SidebarGroupContent>
             <div
               data-envelope-root={ENVELOPE.root}
               data-envelope-spent={ENVELOPE.spent}
               data-envelope-cap={ENVELOPE.cap}
-              className="grid gap-1 px-2 py-1 text-xs"
+              className="grid gap-1 px-2 py-1"
             >
-              <div className="flex items-center gap-1.5 font-medium">
-                <Wallet className="size-3.5 text-muted-foreground" aria-hidden />
-                <span className="font-mono text-[11px]">{ENVELOPE.root}</span>
+              <div className="font-mono text-[11px] text-muted-foreground">{ENVELOPE.root}</div>
+              <div className="font-display text-[22px] font-semibold tracking-tight tabular-nums">
+                {ENVELOPE.spent}
+                <span className="text-sm font-medium text-muted-foreground">
+                  {" "}
+                  of {ENVELOPE.cap}
+                </span>
               </div>
-              <div className="text-muted-foreground">
-                spent <span className="font-medium text-foreground">{ENVELOPE.spent}</span> of{" "}
-                {ENVELOPE.cap}
-              </div>
-              <div className="font-mono text-[10px] tracking-wide text-muted-foreground uppercase">
-                {ENVELOPE.scope}
-              </div>
+              <div className="text-xs text-muted-foreground">{ENVELOPE.scope}</div>
             </div>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="flex items-center justify-between px-1">
-          <span className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-            theme
-          </span>
+        <div className="flex justify-end px-1">
           <ModeToggle />
         </div>
-        <SidebarSeparator className="mx-0 my-2" />
-        <div className="halftone halftone-fade h-8 opacity-60" aria-hidden />
       </SidebarFooter>
     </Sidebar>
   );

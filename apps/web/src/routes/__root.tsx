@@ -6,13 +6,7 @@ import {
   SidebarTrigger,
 } from "@latch-protocol/ui/components/sidebar";
 import { TooltipProvider } from "@latch-protocol/ui/components/tooltip";
-import {
-  HeadContent,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-  useLocation,
-} from "@tanstack/react-router";
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { AppSidebar } from "../components/app-sidebar";
@@ -46,16 +40,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootDocument,
 });
 
-function RoutePathLabel() {
-  const { pathname } = useLocation();
-  return (
-    <span className="font-mono text-[11px] tracking-widest text-muted-foreground">
-      {"//"}
-      {pathname === "/" ? " chat" : pathname.replaceAll("/", " / ").trim()}
-    </span>
-  );
-}
-
 function RootDocument() {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -68,9 +52,8 @@ function RootDocument() {
             <SidebarProvider>
               <AppSidebar />
               <SidebarInset>
-                <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+                <header className="flex shrink-0 items-center border-b border-border px-2 py-1.5">
                   <SidebarTrigger />
-                  <RoutePathLabel />
                 </header>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   <Outlet />

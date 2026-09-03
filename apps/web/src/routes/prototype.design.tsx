@@ -1,24 +1,14 @@
-// PROTOTYPE (#23) — design-system gallery on the throwaway
-// `/prototype/design` route. The shell-variant round (A/B/C) already ran its
-// course: sidebar won and now lives in `app-sidebar.tsx`; the losing shells
-// are preserved on the `throwaway/design-variants` branch. This file is the
-// living gallery the surface builds (#24–#27) steal from: every pattern here
-// is built from shadcn primitives, and what graduates gets folded into the
-// real routes.
+// PROTOTYPE (#23) — component gallery on the throwaway `/prototype/design`
+// route, in the Authorization Terminal direction. Rules, not cards; the
+// clause strip as signature; copy in plain domain voice. The surface builds
+// (#24–#27) steal from here; what graduates gets folded into the real routes.
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUp } from "lucide-react";
-import type { ReactNode } from "react";
 
 import { Badge } from "@latch-protocol/ui/components/badge";
-import { Button, buttonVariants } from "@latch-protocol/ui/components/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@latch-protocol/ui/components/card";
+import { Button } from "@latch-protocol/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@latch-protocol/ui/components/card";
+import { ClauseStrip } from "@latch-protocol/ui/components/clause-strip";
 import {
   InputGroup,
   InputGroupAddon,
@@ -27,7 +17,6 @@ import {
 } from "@latch-protocol/ui/components/input-group";
 import { RejectionReceiptCard } from "@latch-protocol/ui/components/rejection-receipt-card";
 import { Separator } from "@latch-protocol/ui/components/separator";
-import { cn } from "@latch-protocol/ui/lib/utils";
 import {
   Table,
   TableBody,
@@ -36,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@latch-protocol/ui/components/table";
+import { cn } from "@latch-protocol/ui/lib/utils";
 
 export const Route = createFileRoute("/prototype/design")({
   component: DesignGallery,
@@ -51,8 +41,8 @@ const APPROVAL = {
   amount: "₹490.00",
   merchant: "SneakerHead India",
   item: "Street Runner — White",
-  why: "Act 2 auto-checkout · under the UPI-Lite cap",
-  expiry: "single-use · expires 23:59 IST",
+  reason: "Under the ₹550 per-transaction cap, footwear scope matches.",
+  expires: "Single use, expires 23:59 IST.",
   clause: "check if amount_cap($c), spot($s), $s <= $c",
 };
 
@@ -65,228 +55,222 @@ const WATCH_RECEIPT = {
 } as const;
 
 const LEDGER_ROWS = [
-  { id: "hld_9f21", what: "Street Runner — White", status: "Held", when: "12:04:11" },
-  { id: "hld_8c0e", what: "Court Socks — 3 pack", status: "Denied", when: "12:03:47" },
-  { id: "hld_77b2", what: "Chrono Steel Watch", status: "Denied", when: "12:02:03" },
-  { id: "hld_61aa", what: "Limited Bomber Jacket", status: "Captured", when: "11:58:29" },
-  { id: "hld_50f4", what: "Street Runner — White", status: "Voided", when: "11:41:52" },
+  {
+    id: "hld_9f21",
+    what: "Street Runner — White",
+    amount: "₹490.00",
+    state: "hold",
+    when: "12:04:11",
+  },
+  {
+    id: "hld_8c0e",
+    what: "Court Socks — 3 pack",
+    amount: "₹199.00",
+    state: "denied",
+    when: "12:03:47",
+  },
+  {
+    id: "hld_77b2",
+    what: "Chrono Steel Watch",
+    amount: "₹9,000.00",
+    state: "denied",
+    when: "12:02:03",
+  },
+  {
+    id: "hld_61aa",
+    what: "Limited Bomber Jacket",
+    amount: "₹6,000.00",
+    state: "captured",
+    when: "11:58:29",
+  },
+  {
+    id: "hld_50f4",
+    what: "Street Runner — White",
+    amount: "₹490.00",
+    state: "hold",
+    when: "11:41:52",
+  },
 ] as const;
 
 const STORE_ITEMS = [
-  { id: "sku_runner_490", name: "Street Runner — White", price: "₹490", tag: "footwear" },
-  { id: "sku_bomber_6000", name: "Limited Bomber Jacket", price: "₹6,000", tag: "apparel" },
-  { id: "sku_chrono_9000", name: "Chrono Steel Watch", price: "₹9,000", tag: "accessories" },
-  { id: "sku_socks_199", name: "Court Socks — 3 pack", price: "₹199", tag: "apparel" },
+  { id: "sku_runner_490", name: "Street Runner — White", price: "₹490", tag: "Footwear" },
+  { id: "sku_bomber_6000", name: "Limited Bomber Jacket", price: "₹6,000", tag: "Apparel" },
+  { id: "sku_chrono_9000", name: "Chrono Steel Watch", price: "₹9,000", tag: "Accessories" },
+  { id: "sku_socks_199", name: "Court Socks — 3 pack", price: "₹199", tag: "Apparel" },
 ] as const;
 
 // ---------------------------------------------------------------------------
 
-function MonoLabel({ children }: { children: ReactNode }) {
-  return (
-    <div className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-      {children}
-    </div>
-  );
+function SectionTitle({ children }: { children: string }) {
+  return <h2 className="font-display text-xl font-semibold tracking-tight">{children}</h2>;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const variant =
-    status === "Denied"
-      ? "destructive"
-      : status === "Captured"
-        ? "default"
-        : status === "Held"
-          ? "secondary"
-          : status === "Executed"
-            ? "outline"
-            : "ghost";
+function StateMark({ state }: { state: "hold" | "captured" | "denied" }) {
   return (
-    <Badge variant={variant} data-status={status} className="font-mono uppercase">
-      {status}
-    </Badge>
+    <span className="flex items-center gap-1.5">
+      <span
+        aria-hidden
+        className={cn(
+          "text-[10px]",
+          state === "hold" && "text-muted-foreground",
+          state === "captured" && "text-approve",
+          state === "denied" && "text-destructive",
+        )}
+      >
+        {state === "hold" ? "○" : state === "captured" ? "●" : "✕"}
+      </span>
+      <span className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+        {state === "hold" ? "Held" : state === "captured" ? "Captured" : "Denied"}
+      </span>
+    </span>
   );
 }
 
 function ChatSection() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Chat — Act 2</CardTitle>
-        <CardDescription>
-          Pills prefix the prompt · assistant streams flat · one approval card at a time.
-        </CardDescription>
-        <CardAction>
-          <MonoLabel>{"// /"}</MonoLabel>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          {BEAT_PILLS.map((pill) => (
-            <Badge key={pill} variant="outline">
-              {pill}
-            </Badge>
-          ))}
-        </div>
-        <div className="max-w-[80%] justify-self-end bg-primary px-2.5 py-2 text-xs text-primary-foreground">
-          Buy the ₹490 shoes
-        </div>
-        <p className="text-xs leading-relaxed">
-          Found them — Street Runner in footwear, in stock. This fits the envelope, so I&apos;ve
-          staged a hold. Review and approve:
-        </p>
-        <div className="font-mono text-[11px] text-muted-foreground">
-          <div>{"// shop_search → 1 result · in stock"}</div>
-          <div>{"// check_remaining → ₹505.00 of ₹550.00"}</div>
-        </div>
-        <Card data-approval="pending" className="border-l-2 border-l-primary">
-          <CardHeader>
-            <CardTitle className="text-xs">Confirm spend {APPROVAL.amount}</CardTitle>
-            <CardDescription>
-              Awaiting approval — the hold stages nothing until you approve.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-              <dt className="text-muted-foreground">merchant</dt>
-              <dd>{APPROVAL.merchant}</dd>
-              <dt className="text-muted-foreground">items</dt>
-              <dd>{APPROVAL.item}</dd>
-              <dt className="text-muted-foreground">why</dt>
-              <dd className="text-muted-foreground">{APPROVAL.why}</dd>
-              <dt className="text-muted-foreground">expiry</dt>
-              <dd className="text-muted-foreground">{APPROVAL.expiry}</dd>
-            </dl>
-            <Separator />
-            <pre className="overflow-x-auto font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">
-              {APPROVAL.clause}
-            </pre>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm">
-                Reject
-              </Button>
-              <Button type="button" size="sm">
-                Approve
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        <RejectionReceiptCard receipt={{ ...WATCH_RECEIPT }} />
-        <InputGroup>
-          <InputGroupInput placeholder="Ask Latch…" disabled />
-          <InputGroupAddon align="inline-end">
-            <InputGroupButton size="icon-sm" disabled>
-              <ArrowUp aria-hidden />
-              <span className="sr-only">Send</span>
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-      </CardContent>
-    </Card>
+    <section className="grid gap-4">
+      <SectionTitle>Chat</SectionTitle>
+      <div className="flex flex-wrap gap-1.5">
+        {BEAT_PILLS.map((pill) => (
+          <Badge key={pill} variant="secondary" className="font-normal">
+            {pill}
+          </Badge>
+        ))}
+      </div>
+      <div className="max-w-[80%] justify-self-end bg-primary px-2.5 py-2 text-[13px] text-primary-foreground">
+        Buy the ₹490 shoes
+      </div>
+      <p className="max-w-prose text-[13px] leading-relaxed">
+        Found them — Street Runner in footwear, in stock. This fits the envelope, so I staged a
+        hold. Review and approve:
+      </p>
+      <div className="grid gap-0.5 font-mono text-[11px] text-muted-foreground">
+        <div>shop_search → 1 result, in stock</div>
+        <div>check_remaining → ₹505.00 of ₹550.00</div>
+      </div>
+      <Card data-approval="pending">
+        <CardHeader>
+          <CardTitle className="font-display text-base">
+            Approve {APPROVAL.amount} to {APPROVAL.merchant}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
+            <dt className="text-muted-foreground">Item</dt>
+            <dd>{APPROVAL.item}</dd>
+            <dt className="text-muted-foreground">Why it fits</dt>
+            <dd className="text-muted-foreground">{APPROVAL.reason}</dd>
+            <dt className="text-muted-foreground">Expiry</dt>
+            <dd className="text-muted-foreground">{APPROVAL.expires}</dd>
+          </dl>
+          <ClauseStrip state="hold" clause={APPROVAL.clause} result="₹490.00 ≤ ₹550.00" />
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline">
+              Reject
+            </Button>
+            <Button
+              type="button"
+              className="bg-approve text-approve-foreground hover:bg-approve/90"
+            >
+              Approve ₹490.00
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      <RejectionReceiptCard receipt={{ ...WATCH_RECEIPT }} />
+      <ClauseStrip state="denied" clause={WATCH_RECEIPT.clause} result="got ₹9,000.00" />
+      <InputGroup>
+        <InputGroupInput placeholder="Ask for anything in the store…" disabled />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton size="icon-sm" disabled>
+            <ArrowUp aria-hidden />
+            <span className="sr-only">Send</span>
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </section>
   );
 }
 
 function LedgerSection() {
   return (
-    <div className="grid gap-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { label: "held now", value: "₹490.00" },
-          { label: "captured today", value: "₹6,000.00" },
-          { label: "denied today", value: "2" },
-        ].map((stat) => (
-          <Card key={stat.label} size="sm">
-            <CardContent>
-              <MonoLabel>{stat.label}</MonoLabel>
-              <div className="mt-1 text-lg font-semibold tracking-tight">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Ledger — live</CardTitle>
-          <CardDescription>Densest-first journal · 2s poll morphs chips in place.</CardDescription>
-          <CardAction>
-            <MonoLabel>{"// /ledger"}</MonoLabel>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {["Held", "Executed", "Captured", "Voided", "Denied"].map((s) => (
-              <StatusBadge key={s} status={s} />
-            ))}
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Hold</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {LEDGER_ROWS.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="font-mono">{row.id}</TableCell>
-                  <TableCell>{row.what}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={row.status} />
-                  </TableCell>
-                  <TableCell className="font-mono text-muted-foreground">{row.when}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+    <section className="grid gap-3">
+      <SectionTitle>Ledger</SectionTitle>
+      <Table>
+        <TableHeader>
+          <TableRow className="h-8">
+            <TableHead className="font-mono text-[11px] tracking-wide uppercase">Hold</TableHead>
+            <TableHead className="font-mono text-[11px] tracking-wide uppercase">Item</TableHead>
+            <TableHead className="text-right font-mono text-[11px] tracking-wide uppercase">
+              Amount
+            </TableHead>
+            <TableHead className="font-mono text-[11px] tracking-wide uppercase">State</TableHead>
+            <TableHead className="text-right font-mono text-[11px] tracking-wide uppercase">
+              Time
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {LEDGER_ROWS.map((row) => (
+            <TableRow key={row.id} className="h-10">
+              <TableCell className="font-mono text-[12px]">{row.id}</TableCell>
+              <TableCell>{row.what}</TableCell>
+              <TableCell className="text-right font-mono text-[12px] tabular-nums">
+                {row.amount}
+              </TableCell>
+              <TableCell>
+                <StateMark state={row.state} />
+              </TableCell>
+              <TableCell className="text-right font-mono text-[12px] text-muted-foreground tabular-nums">
+                {row.when}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
   );
 }
 
 function StoreSection() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Store — agent.json</CardTitle>
-        <CardDescription>One file, four items · Buy deep-links into chat.</CardDescription>
-        <CardAction>
-          <MonoLabel>{"// /store"}</MonoLabel>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="grid gap-2 sm:grid-cols-2">
+    <section className="grid gap-1">
+      <SectionTitle>Store</SectionTitle>
+      <p className="text-[13px] text-muted-foreground">
+        Four items from agent.json. Choosing one continues in chat, where the hold is staged and
+        approved.
+      </p>
+      <div>
         {STORE_ITEMS.map((item) => (
-          <Card key={item.id} size="sm">
-            <CardContent className="grid gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium">{item.name}</span>
-                <Badge variant="outline" className="font-mono uppercase">
-                  {item.tag}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">{item.price}</span>
-                <a
-                  href={`/?q=buy-${item.id}`}
-                  className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
-                >
-                  Buy via agent
-                </a>
-              </div>
-            </CardContent>
-          </Card>
+          <div
+            key={item.id}
+            className="flex items-center gap-3 border-b border-border py-2.5 last:border-0"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-medium">{item.name}</div>
+              <div className="text-xs text-muted-foreground">{item.tag}</div>
+            </div>
+            <div className="font-mono text-[13px] tabular-nums">{item.price}</div>
+            <a
+              href={`/?q=buy-${item.id}`}
+              className={cn("text-[13px] font-medium text-foreground underline underline-offset-4")}
+            >
+              Continue in chat
+            </a>
+          </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
 function DesignGallery() {
   return (
-    <div className="mx-auto grid max-w-3xl gap-4 p-4 pb-20">
-      <MonoLabel>{"// design-system gallery — shadcn primitives only"}</MonoLabel>
+    <div className="mx-auto grid max-w-2xl gap-8 p-4 pb-20 sm:p-6">
       <ChatSection />
+      <Separator />
       <LedgerSection />
+      <Separator />
       <StoreSection />
     </div>
   );
