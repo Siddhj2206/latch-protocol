@@ -1,9 +1,21 @@
 import { Toaster } from "@latch-protocol/ui/components/sonner";
 import { ThemeProvider } from "@latch-protocol/ui/components/theme-provider";
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@latch-protocol/ui/components/sidebar";
+import { TooltipProvider } from "@latch-protocol/ui/components/tooltip";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+  useLocation,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from "../components/header";
+import { AppSidebar } from "../components/app-sidebar";
 
 import appCss from "../index.css?url";
 
@@ -20,7 +32,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "My App",
+        title: "Latch Protocol",
       },
     ],
     links: [
@@ -34,6 +46,16 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootDocument,
 });
 
+function RoutePathLabel() {
+  const { pathname } = useLocation();
+  return (
+    <span className="font-mono text-[11px] tracking-widest text-muted-foreground">
+      {"//"}
+      {pathname === "/" ? " chat" : pathname.replaceAll("/", " / ").trim()}
+    </span>
+  );
+}
+
 function RootDocument() {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -42,10 +64,20 @@ function RootDocument() {
       </head>
       <body>
         <ThemeProvider defaultTheme="system" storageKey="latch-theme">
-          <div className="grid h-svh grid-rows-[auto_1fr]">
-            <Header />
-            <Outlet />
-          </div>
+          <TooltipProvider>
+            <SidebarProvider>
+              <AppSidebar />
+              <SidebarInset>
+                <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+                  <SidebarTrigger />
+                  <RoutePathLabel />
+                </header>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <Outlet />
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
+          </TooltipProvider>
           <Toaster richColors />
         </ThemeProvider>
         <TanStackRouterDevtools position="bottom-left" />
