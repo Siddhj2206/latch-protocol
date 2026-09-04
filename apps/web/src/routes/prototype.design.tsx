@@ -35,22 +35,22 @@ export const Route = createFileRoute("/prototype/design")({
 // ---------------------------------------------------------------------------
 
 const BEAT_ROWS = [
-  { cmd: "/ buy-shoes", meta: "Street Runner · ₹490 · footwear" },
-  { cmd: "/ buy-jacket", meta: "Bomber · ₹6,000 · needs step-up" },
-  { cmd: "/ buy-watch", meta: "Chrono · ₹9,000 · over the cap" },
+  { cmd: "/ buy-shoes", meta: "₹490 · footwear" },
+  { cmd: "/ buy-jacket", meta: "₹6,000 · needs step-up" },
+  { cmd: "/ buy-watch", meta: "₹9,000 · over the cap" },
 ];
 
 const TOOL_ROWS = [
   { verb: "Searched store", detail: '"shoes" · 1 hit' },
-  { verb: "Checked envelope", detail: "₹505.00 of ₹550.00" },
-  { verb: "Staged hold", detail: "hld_9f21 · awaiting decision" },
+  { verb: "Checked envelope", detail: "fits the ₹550 cap" },
+  { verb: "Staged hold", detail: "hld_9f21" },
 ];
 
 const APPROVAL = {
   amount: "₹490.00",
   merchant: "SneakerHead India",
   item: "Street Runner — White",
-  reason: "Under the ₹550 per-transaction cap, footwear scope matches.",
+  reason: "Under the ₹550 cap.",
   expires: "Single use, expires 23:59 IST.",
   clause: "check if amount_cap($c), spot($s), $s <= $c",
 };
@@ -102,10 +102,34 @@ const LEDGER_ROWS = [
 ] as const;
 
 const STORE_ITEMS = [
-  { id: "sku_runner_490", name: "Street Runner — White", price: "₹490", tag: "Footwear" },
-  { id: "sku_bomber_6000", name: "Limited Bomber Jacket", price: "₹6,000", tag: "Apparel" },
-  { id: "sku_chrono_9000", name: "Chrono Steel Watch", price: "₹9,000", tag: "Accessories" },
-  { id: "sku_socks_199", name: "Court Socks — 3 pack", price: "₹199", tag: "Apparel" },
+  {
+    n: "01",
+    id: "sku_runner_490",
+    name: "Street Runner — White",
+    spec: "Footwear · sizes 40–44",
+    price: "₹490",
+  },
+  {
+    n: "02",
+    id: "sku_bomber_6000",
+    name: "Limited Bomber Jacket",
+    spec: "Apparel · sizes M–XL",
+    price: "₹6,000",
+  },
+  {
+    n: "03",
+    id: "sku_chrono_9000",
+    name: "Chrono Steel Watch",
+    spec: "Accessories · steel, 5 ATM",
+    price: "₹9,000",
+  },
+  {
+    n: "04",
+    id: "sku_socks_199",
+    name: "Court Socks — 3 pack",
+    spec: "Apparel · cotton, UK 6–10",
+    price: "₹199",
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -154,8 +178,7 @@ function ChatSection() {
         Buy the ₹490 shoes
       </div>
       <p className="max-w-prose text-[13px] leading-relaxed">
-        Found them — Street Runner in footwear, in stock. This fits the envelope, so I staged a
-        hold. Review and approve:
+        Street Runner is in stock and fits the envelope.
       </p>
       <div className="grid">
         {TOOL_ROWS.map((row) => (
@@ -203,9 +226,6 @@ function ChatSection() {
           </div>
         </CardContent>
       </Card>
-      <p className="font-mono text-[12px] text-muted-foreground">
-        ✓ Approved {APPROVAL.amount} → {APPROVAL.merchant} · {APPROVAL.item} ×1 · hld_9f21 · 12:04
-      </p>
       <RejectionReceiptCard receipt={{ ...WATCH_RECEIPT }} />
       <ClauseStrip state="denied" clause={WATCH_RECEIPT.clause} result="got ₹9,000.00" />
       <p className="font-mono text-[12px] text-muted-foreground">
@@ -230,35 +250,41 @@ function ChatSection() {
 
 function LedgerSection() {
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-2">
       <SectionTitle>Ledger</SectionTitle>
+      <div className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+        Today · 5 holds
+      </div>
       <Table>
         <TableHeader>
           <TableRow className="h-8">
-            <TableHead className="font-mono text-[11px] tracking-wide uppercase">Hold</TableHead>
+            <TableHead className="font-mono text-[11px] tracking-wide uppercase">Time</TableHead>
             <TableHead className="font-mono text-[11px] tracking-wide uppercase">Item</TableHead>
             <TableHead className="text-right font-mono text-[11px] tracking-wide uppercase">
               Amount
             </TableHead>
             <TableHead className="font-mono text-[11px] tracking-wide uppercase">State</TableHead>
-            <TableHead className="text-right font-mono text-[11px] tracking-wide uppercase">
-              Time
-            </TableHead>
+            <TableHead className="w-8" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {LEDGER_ROWS.map((row) => (
-            <TableRow key={row.id} className={cn(row.state === "hold" && "hold-tone", "h-10")}>
-              <TableCell className="font-mono text-[12px]">{row.id}</TableCell>
-              <TableCell>{row.what}</TableCell>
-              <TableCell className="text-right font-mono text-[12px] tabular-nums">
+            <TableRow key={row.id} className={cn(row.state === "hold" && "hold-tone", "h-12")}>
+              <TableCell className="font-mono text-[12px] text-muted-foreground tabular-nums">
+                {row.when}
+              </TableCell>
+              <TableCell>
+                <div className="text-[13px]">{row.what}</div>
+                <div className="font-mono text-[11px] text-muted-foreground">{row.id}</div>
+              </TableCell>
+              <TableCell className="text-right font-mono text-[13px] tabular-nums">
                 {row.amount}
               </TableCell>
               <TableCell>
                 <StateMark state={row.state} />
               </TableCell>
-              <TableCell className="text-right font-mono text-[12px] text-muted-foreground tabular-nums">
-                {row.when}
+              <TableCell>
+                <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
               </TableCell>
             </TableRow>
           ))}
@@ -270,30 +296,28 @@ function LedgerSection() {
 
 function StoreSection() {
   return (
-    <section className="grid gap-1">
+    <section className="grid gap-2">
       <SectionTitle>Store</SectionTitle>
-      <p className="text-[13px] text-muted-foreground">
-        Four items from agent.json. Choosing one continues in chat, where the hold is staged and
-        approved.
-      </p>
+      <div className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+        agent.json · 4 items · INR · no checkout here
+      </div>
       <div>
         {STORE_ITEMS.map((item) => (
-          <div
+          <a
             key={item.id}
-            className="flex items-center gap-3 border-b border-border py-2.5 last:border-0"
+            href={`/?q=buy-${item.id}`}
+            className="flex items-center gap-3 border-b border-border py-3 last:border-0"
           >
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium">{item.name}</div>
-              <div className="text-xs text-muted-foreground">{item.tag}</div>
-            </div>
-            <div className="font-mono text-[13px] tabular-nums">{item.price}</div>
-            <a
-              href={`/?q=buy-${item.id}`}
-              className={cn("text-[13px] font-medium text-foreground underline underline-offset-4")}
-            >
+            <span className="font-mono text-[12px] text-muted-foreground">{item.n}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium">{item.name}</span>
+              <span className="block text-xs text-muted-foreground">{item.spec}</span>
+            </span>
+            <span className="font-mono text-[13px] tabular-nums">{item.price}</span>
+            <span className="text-[13px] font-medium underline underline-offset-4">
               Continue in chat
-            </a>
-          </div>
+            </span>
+          </a>
         ))}
       </div>
     </section>
