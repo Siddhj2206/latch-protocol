@@ -3,9 +3,8 @@
 // clause strip as signature; copy in plain domain voice. The surface builds
 // (#24–#27) steal from here; what graduates gets folded into the real routes.
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Check, ChevronRight, Lock } from "lucide-react";
 
-import { Badge } from "@latch-protocol/ui/components/badge";
 import { Button } from "@latch-protocol/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@latch-protocol/ui/components/card";
 import { ClauseStrip } from "@latch-protocol/ui/components/clause-strip";
@@ -35,7 +34,17 @@ export const Route = createFileRoute("/prototype/design")({
 // Sample data (agreed contracts: #22 lineup + ₹550 UPI-Lite cap, #20 beats).
 // ---------------------------------------------------------------------------
 
-const BEAT_PILLS = ["Buy the ₹490 shoes", "Buy the ₹6,000 jacket", "Buy the ₹9,000 watch"];
+const BEAT_ROWS = [
+  { cmd: "/ buy-shoes", meta: "Street Runner · ₹490 · footwear" },
+  { cmd: "/ buy-jacket", meta: "Bomber · ₹6,000 · needs step-up" },
+  { cmd: "/ buy-watch", meta: "Chrono · ₹9,000 · over the cap" },
+];
+
+const TOOL_ROWS = [
+  { verb: "Searched store", detail: '"shoes" · 1 hit' },
+  { verb: "Checked envelope", detail: "₹505.00 of ₹550.00" },
+  { verb: "Staged hold", detail: "hld_9f21 · awaiting decision" },
+];
 
 const APPROVAL = {
   amount: "₹490.00",
@@ -130,11 +139,15 @@ function ChatSection() {
   return (
     <section className="grid gap-4">
       <SectionTitle>Chat</SectionTitle>
-      <div className="flex flex-wrap gap-1.5">
-        {BEAT_PILLS.map((pill) => (
-          <Badge key={pill} variant="secondary" className="font-normal">
-            {pill}
-          </Badge>
+      <div className="grid border-y border-border">
+        {BEAT_ROWS.map((beat) => (
+          <div
+            key={beat.cmd}
+            className="flex items-baseline gap-3 border-b border-border py-2 last:border-0"
+          >
+            <span className="font-mono text-[12px] text-foreground">{beat.cmd}</span>
+            <span className="truncate text-xs text-muted-foreground">{beat.meta}</span>
+          </div>
         ))}
       </div>
       <div className="max-w-[80%] justify-self-end bg-primary px-2.5 py-2 text-[13px] text-primary-foreground">
@@ -144,43 +157,66 @@ function ChatSection() {
         Found them — Street Runner in footwear, in stock. This fits the envelope, so I staged a
         hold. Review and approve:
       </p>
-      <div className="grid gap-0.5 font-mono text-[11px] text-muted-foreground">
-        <div>shop_search → 1 result, in stock</div>
-        <div>check_remaining → ₹505.00 of ₹550.00</div>
+      <div className="grid">
+        {TOOL_ROWS.map((row) => (
+          <div key={row.verb} className="flex items-center gap-1.5 py-0.5 text-[12px]">
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span>
+              {row.verb} <span className="text-muted-foreground">— {row.detail}</span>
+            </span>
+            <Check className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          </div>
+        ))}
       </div>
       <Card data-approval="pending">
         <CardHeader>
-          <CardTitle className="font-display text-base">
-            Approve {APPROVAL.amount} to {APPROVAL.merchant}
+          <div className="flex items-center gap-1.5 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+            <Lock className="size-3" aria-hidden />
+            Authorize this hold · envelope lch_root_7f3a
+          </div>
+          <CardTitle className="font-display text-[32px] font-semibold tracking-tight tabular-nums">
+            {APPROVAL.amount}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
-            <dt className="text-muted-foreground">Item</dt>
-            <dd>{APPROVAL.item}</dd>
-            <dt className="text-muted-foreground">Why it fits</dt>
-            <dd className="text-muted-foreground">{APPROVAL.reason}</dd>
-            <dt className="text-muted-foreground">Expiry</dt>
-            <dd className="text-muted-foreground">{APPROVAL.expires}</dd>
-          </dl>
+          <div className="text-[13px]">
+            {APPROVAL.item} ×1 @ {APPROVAL.merchant}
+          </div>
+          <div className="max-w-prose text-[13px] text-muted-foreground">{APPROVAL.reason}</div>
+          <div className="font-mono text-[11px] text-muted-foreground">
+            {APPROVAL.expires} · hld_9f21
+          </div>
           <ClauseStrip state="hold" clause={APPROVAL.clause} result="₹490.00 ≤ ₹550.00" />
-          <div className="flex gap-2 pt-1">
-            <Button type="button" variant="outline">
-              Reject
-            </Button>
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              className="text-[13px] font-medium text-destructive hover:underline hover:underline-offset-4"
+            >
+              Reject hold
+            </button>
             <Button
               type="button"
               className="bg-approve text-approve-foreground hover:bg-approve/90"
             >
-              Approve ₹490.00
+              Approve {APPROVAL.amount}
             </Button>
           </div>
         </CardContent>
       </Card>
+      <p className="font-mono text-[12px] text-muted-foreground">
+        ✓ Approved {APPROVAL.amount} → {APPROVAL.merchant} · {APPROVAL.item} ×1 · hld_9f21 · 12:04
+      </p>
       <RejectionReceiptCard receipt={{ ...WATCH_RECEIPT }} />
       <ClauseStrip state="denied" clause={WATCH_RECEIPT.clause} result="got ₹9,000.00" />
+      <p className="font-mono text-[12px] text-muted-foreground">
+        ✕ Declined ₹9,000.00 to SneakerHead India · kept in envelope · hld_77b2 · 12:02:03 · nothing
+        moved
+      </p>
       <InputGroup>
-        <InputGroupInput placeholder="Ask for anything in the store…" disabled />
+        <InputGroupInput
+          placeholder="Awaiting decision on ₹490.00 — approve or reject above"
+          disabled
+        />
         <InputGroupAddon align="inline-end">
           <InputGroupButton size="icon-sm" disabled>
             <ArrowUp aria-hidden />
