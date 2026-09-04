@@ -5,7 +5,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUp, Check, ChevronRight, Lock } from "lucide-react";
 
-import { Button } from "@latch-protocol/ui/components/button";
+import { Button, buttonVariants } from "@latch-protocol/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@latch-protocol/ui/components/card";
 import { ClauseStrip } from "@latch-protocol/ui/components/clause-strip";
 import {
@@ -103,39 +103,43 @@ const LEDGER_ROWS = [
 
 const STORE_ITEMS = [
   {
-    n: "01",
     id: "sku_runner_490",
     name: "Street Runner — White",
-    spec: "Footwear · sizes 40–44",
+    spec: "Sizes 40–44",
     price: "₹490",
+    image: "/products/shoes.jpg",
+    alt: "White running shoe",
   },
   {
-    n: "02",
     id: "sku_bomber_6000",
     name: "Limited Bomber Jacket",
-    spec: "Apparel · sizes M–XL",
+    spec: "Sizes M–XL",
     price: "₹6,000",
+    image: "/products/jacket.jpg",
+    alt: "Model wearing an olive bomber jacket",
   },
   {
-    n: "03",
     id: "sku_chrono_9000",
     name: "Chrono Steel Watch",
-    spec: "Accessories · steel, 5 ATM",
+    spec: "Steel, 5 ATM",
     price: "₹9,000",
+    image: "/products/watch.jpg",
+    alt: "Stainless steel wristwatch on white",
   },
   {
-    n: "04",
     id: "sku_socks_199",
     name: "Court Socks — 3 pack",
-    spec: "Apparel · cotton, UK 6–10",
+    spec: "Cotton, UK 6–10",
     price: "₹199",
+    image: "/products/socks.jpg",
+    alt: "Folded socks on pastel backing",
   },
 ] as const;
 
 // ---------------------------------------------------------------------------
 
 function SectionTitle({ children }: { children: string }) {
-  return <h2 className="font-display text-xl font-semibold tracking-tight">{children}</h2>;
+  return <h2 className="font-display text-2xl font-semibold tracking-tight">{children}</h2>;
 }
 
 function StateMark({ state }: { state: "hold" | "captured" | "denied" }) {
@@ -152,7 +156,7 @@ function StateMark({ state }: { state: "hold" | "captured" | "denied" }) {
       >
         {state === "hold" ? "○" : state === "captured" ? "●" : "✕"}
       </span>
-      <span className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+      <span className="font-mono text-xs tracking-wide text-muted-foreground uppercase">
         {state === "hold" ? "Held" : state === "captured" ? "Captured" : "Denied"}
       </span>
     </span>
@@ -169,20 +173,20 @@ function ChatSection() {
             key={beat.cmd}
             className="flex items-baseline gap-3 border-b border-border py-2 last:border-0"
           >
-            <span className="font-mono text-[12px] text-foreground">{beat.cmd}</span>
+            <span className="font-mono text-[13px] text-foreground">{beat.cmd}</span>
             <span className="truncate text-xs text-muted-foreground">{beat.meta}</span>
           </div>
         ))}
       </div>
-      <div className="max-w-[80%] justify-self-end bg-primary px-2.5 py-2 text-[13px] text-primary-foreground">
+      <div className="max-w-[80%] justify-self-end bg-primary px-2.5 py-2 text-[15px] text-primary-foreground">
         Buy the ₹490 shoes
       </div>
-      <p className="max-w-prose text-[13px] leading-relaxed">
+      <p className="max-w-prose text-[15px] leading-relaxed">
         Street Runner is in stock and fits the envelope.
       </p>
       <div className="grid">
         {TOOL_ROWS.map((row) => (
-          <div key={row.verb} className="flex items-center gap-1.5 py-0.5 text-[12px]">
+          <div key={row.verb} className="flex items-center gap-1.5 py-0.5 text-[13px]">
             <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
             <span>
               {row.verb} <span className="text-muted-foreground">— {row.detail}</span>
@@ -191,29 +195,41 @@ function ChatSection() {
           </div>
         ))}
       </div>
+      <div className="flex items-center gap-3 border border-border">
+        <img
+          src="/products/shoes.jpg"
+          alt="White running shoe"
+          loading="lazy"
+          className="size-20 shrink-0 object-cover"
+        />
+        <div className="min-w-0 py-2 pr-3">
+          <div className="truncate text-[15px] font-medium">Street Runner — White</div>
+          <div className="font-mono text-[15px] tabular-nums">₹490</div>
+        </div>
+      </div>
       <Card data-approval="pending">
         <CardHeader>
-          <div className="flex items-center gap-1.5 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+          <div className="flex items-center gap-1.5 font-mono text-xs tracking-wide text-muted-foreground uppercase">
             <Lock className="size-3" aria-hidden />
             Authorize this hold · envelope lch_root_7f3a
           </div>
-          <CardTitle className="font-display text-[32px] font-semibold tracking-tight tabular-nums">
+          <CardTitle className="font-display text-4xl font-semibold tracking-tight tabular-nums">
             {APPROVAL.amount}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-2">
-          <div className="text-[13px]">
+          <div className="text-[15px]">
             {APPROVAL.item} ×1 @ {APPROVAL.merchant}
           </div>
-          <div className="max-w-prose text-[13px] text-muted-foreground">{APPROVAL.reason}</div>
-          <div className="font-mono text-[11px] text-muted-foreground">
+          <div className="max-w-prose text-[15px] text-muted-foreground">{APPROVAL.reason}</div>
+          <div className="font-mono text-xs text-muted-foreground">
             {APPROVAL.expires} · hld_9f21
           </div>
           <ClauseStrip state="hold" clause={APPROVAL.clause} result="₹490.00 ≤ ₹550.00" />
           <div className="flex items-center justify-between pt-1">
             <button
               type="button"
-              className="text-[13px] font-medium text-destructive hover:underline hover:underline-offset-4"
+              className="text-[15px] font-medium text-destructive hover:underline hover:underline-offset-4"
             >
               Reject hold
             </button>
@@ -228,14 +244,15 @@ function ChatSection() {
       </Card>
       <RejectionReceiptCard receipt={{ ...WATCH_RECEIPT }} />
       <ClauseStrip state="denied" clause={WATCH_RECEIPT.clause} result="got ₹9,000.00" />
-      <p className="font-mono text-[12px] text-muted-foreground">
+      <p className="font-mono text-[13px] text-muted-foreground">
         ✕ Declined ₹9,000.00 to SneakerHead India · kept in envelope · hld_77b2 · 12:02:03 · nothing
         moved
       </p>
-      <InputGroup>
+      <InputGroup className="h-12">
         <InputGroupInput
           placeholder="Awaiting decision on ₹490.00 — approve or reject above"
           disabled
+          className="text-[15px]"
         />
         <InputGroupAddon align="inline-end">
           <InputGroupButton size="icon-sm" disabled>
@@ -252,32 +269,32 @@ function LedgerSection() {
   return (
     <section className="grid gap-2">
       <SectionTitle>Ledger</SectionTitle>
-      <div className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+      <div className="font-mono text-xs tracking-wide text-muted-foreground uppercase">
         Today · 5 holds
       </div>
       <Table>
         <TableHeader>
           <TableRow className="h-8">
-            <TableHead className="font-mono text-[11px] tracking-wide uppercase">Time</TableHead>
-            <TableHead className="font-mono text-[11px] tracking-wide uppercase">Item</TableHead>
-            <TableHead className="text-right font-mono text-[11px] tracking-wide uppercase">
+            <TableHead className="font-mono text-xs tracking-wide uppercase">Time</TableHead>
+            <TableHead className="font-mono text-xs tracking-wide uppercase">Item</TableHead>
+            <TableHead className="text-right font-mono text-xs tracking-wide uppercase">
               Amount
             </TableHead>
-            <TableHead className="font-mono text-[11px] tracking-wide uppercase">State</TableHead>
+            <TableHead className="font-mono text-xs tracking-wide uppercase">State</TableHead>
             <TableHead className="w-8" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {LEDGER_ROWS.map((row) => (
-            <TableRow key={row.id} className={cn(row.state === "hold" && "hold-tone", "h-12")}>
-              <TableCell className="font-mono text-[12px] text-muted-foreground tabular-nums">
+            <TableRow key={row.id} className={cn(row.state === "hold" && "hold-tone", "h-14")}>
+              <TableCell className="font-mono text-[13px] text-muted-foreground tabular-nums">
                 {row.when}
               </TableCell>
               <TableCell>
-                <div className="text-[13px]">{row.what}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">{row.id}</div>
+                <div className="text-[15px]">{row.what}</div>
+                <div className="font-mono text-xs text-muted-foreground">{row.id}</div>
               </TableCell>
-              <TableCell className="text-right font-mono text-[13px] tabular-nums">
+              <TableCell className="text-right font-mono text-[15px] tabular-nums">
                 {row.amount}
               </TableCell>
               <TableCell>
@@ -296,28 +313,31 @@ function LedgerSection() {
 
 function StoreSection() {
   return (
-    <section className="grid gap-2">
+    <section className="grid gap-3">
       <SectionTitle>Store</SectionTitle>
-      <div className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
-        agent.json · 4 items · INR · no checkout here
-      </div>
-      <div>
+      <div className="grid grid-cols-2 gap-px border border-border bg-border">
         {STORE_ITEMS.map((item) => (
-          <a
-            key={item.id}
-            href={`/?q=buy-${item.id}`}
-            className="flex items-center gap-3 border-b border-border py-3 last:border-0"
-          >
-            <span className="font-mono text-[12px] text-muted-foreground">{item.n}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium">{item.name}</span>
-              <span className="block text-xs text-muted-foreground">{item.spec}</span>
-            </span>
-            <span className="font-mono text-[13px] tabular-nums">{item.price}</span>
-            <span className="text-[13px] font-medium underline underline-offset-4">
-              Continue in chat
-            </span>
-          </a>
+          <div key={item.id} className="grid bg-card">
+            <img
+              src={item.image}
+              alt={item.alt}
+              loading="lazy"
+              className="aspect-[4/3] w-full object-cover"
+            />
+            <div className="grid gap-0.5 p-3">
+              <div className="truncate text-[15px] font-medium">{item.name}</div>
+              <div className="text-sm text-muted-foreground">{item.spec}</div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="font-mono text-[17px] font-medium tabular-nums">{item.price}</span>
+                <a
+                  href={`/?q=buy-${item.id}`}
+                  className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+                >
+                  Buy
+                </a>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     </section>
@@ -326,7 +346,7 @@ function StoreSection() {
 
 function DesignGallery() {
   return (
-    <div className="mx-auto grid max-w-2xl gap-8 p-4 pb-20 sm:p-6">
+    <div className="mx-auto grid max-w-3xl gap-8 p-4 pb-20 sm:p-6">
       <ChatSection />
       <Separator />
       <LedgerSection />

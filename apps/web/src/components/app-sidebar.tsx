@@ -71,7 +71,7 @@ export function AppSidebar() {
               className="grid gap-1 px-2 py-1"
             >
               <div className="font-mono text-[11px] text-muted-foreground">{ENVELOPE.root}</div>
-              <div className="font-display text-[22px] font-semibold tracking-tight tabular-nums">
+              <div className="font-display text-2xl font-semibold tracking-tight tabular-nums">
                 {ENVELOPE.spent}
                 <span className="text-sm font-medium text-muted-foreground">
                   {" "}
